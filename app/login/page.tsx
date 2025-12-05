@@ -1,33 +1,33 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import Link from "next/link"
-import { Zap } from "lucide-react"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import Link from "next/link";
+import { Zap } from "lucide-react";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-  })
-  const [error, setError] = useState("")
+  });
+  const [error, setError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-    setError("")
-  }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setError("");
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!formData.email || !formData.password) {
-      setError("Email and password are required")
-      return
+      setError("Email and password are required");
+      return;
     }
 
     // Demo: Accept any credentials
@@ -38,12 +38,12 @@ export default function LoginPage() {
         email: formData.email,
         walletId: "0x742d35Cc6634C0532925a3b844Bc9e7595f1a",
         tokenBalance: 1250,
-      }),
-    )
-    localStorage.setItem("isLoggedIn", "true")
+      })
+    );
+    localStorage.setItem("isLoggedIn", "true");
 
-    window.location.href = "/dashboard"
-  }
+    window.location.href = "/dashboard";
+  };
 
   return (
     <main className="min-h-screen bg-background text-foreground flex items-center justify-center px-6 py-12">
@@ -60,16 +60,21 @@ export default function LoginPage() {
       <Card className="w-full max-w-md border-border bg-card">
         <div className="p-8">
           <div className="flex items-center justify-center gap-2 mb-8">
-            <Zap className="w-8 h-8 text-accent" />
+            {/* <Zap className="w-8 h-8 text-accent" /> */}
+            <img src="./sage.jpeg" alt="logo" className="w-8 h-8" />
             <span className="text-2xl font-bold">Sage Token</span>
           </div>
 
           <h1 className="text-2xl font-bold mb-2 text-center">Welcome Back</h1>
-          <p className="text-muted-foreground text-center mb-6">Login to your mining account</p>
+          <p className="text-muted-foreground text-center mb-6">
+            Login to your mining account
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-foreground">Email</label>
+              <label className="text-sm font-medium text-foreground">
+                Email
+              </label>
               <Input
                 type="email"
                 name="email"
@@ -81,7 +86,9 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground">Password</label>
+              <label className="text-sm font-medium text-foreground">
+                Password
+              </label>
               <Input
                 type="password"
                 name="password"
@@ -98,14 +105,20 @@ export default function LoginPage() {
               </div>
             )}
 
-            <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 mt-6">
+            <Button
+              type="submit"
+              className="w-full bg-accent text-accent-foreground hover:bg-accent/90 mt-6"
+            >
               Login
             </Button>
           </form>
 
           <div className="mt-6 pt-6 border-t border-border space-y-3">
             <Link href="/forgot-password">
-              <Button variant="ghost" className="w-full text-accent hover:bg-accent/10">
+              <Button
+                variant="ghost"
+                className="w-full text-accent hover:bg-accent/10"
+              >
                 Forgot Password?
               </Button>
             </Link>
@@ -120,5 +133,5 @@ export default function LoginPage() {
         </div>
       </Card>
     </main>
-  )
+  );
 }

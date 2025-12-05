@@ -79,8 +79,8 @@ export default function Dashboard() {
     totalCompleted: 0,
   });
   const [activeTab, setActiveTab] = useState<
-    "normal" | "withdraw" | "referrals" | "notifications"
-  >("normal");
+    "mining" | "tasks" | "withdraw" | "referrals" | "notifications" | "info"
+  >("mining");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [withdrawalHistory, setWithdrawalHistory] = useState<
@@ -321,7 +321,8 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  const normalTasks = tasks;
+  const miningTasks = tasks.filter((task) => task.type === "mining");
+  const otherTasks = tasks.filter((task) => task.type !== "mining");
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -331,7 +332,8 @@ export default function Dashboard() {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Zap className="w-8 h-8 text-accent" />
+            {/* <Zap className="w-8 h-8 text-accent" /> */}
+             <img src="./sage.jpeg" alt="logo" className="w-8 h-8" />
             <span className="text-2xl font-bold">Sage Token</span>
           </div>
           <div className="flex items-center gap-4">
@@ -374,11 +376,7 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <Link href="/admin">
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-                Admin Panel
-              </Button>
-            </Link>
+            {/* Admin access removed from user interface - access via /sageadmin */}
           </div>
         </Card>
 
@@ -435,14 +433,24 @@ export default function Dashboard() {
         {/* Tabs */}
         <div className="flex gap-4 mb-8 border-b border-border flex-wrap">
           <Button
-            onClick={() => setActiveTab("normal")}
-            variant={activeTab === "normal" ? "default" : "ghost"}
+            onClick={() => setActiveTab("mining")}
+            variant={activeTab === "mining" ? "default" : "ghost"}
             className={
-              activeTab === "normal" ? "bg-accent text-accent-foreground" : ""
+              activeTab === "mining" ? "bg-accent text-accent-foreground" : ""
             }
           >
             <Cpu className="w-4 h-4 mr-2" />
-            Mining Tasks
+            Mining
+          </Button>
+          <Button
+            onClick={() => setActiveTab("tasks")}
+            variant={activeTab === "tasks" ? "default" : "ghost"}
+            className={
+              activeTab === "tasks" ? "bg-accent text-accent-foreground" : ""
+            }
+          >
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+            Tasks
           </Button>
           <Button
             onClick={() => setActiveTab("referrals")}
@@ -478,18 +486,28 @@ export default function Dashboard() {
             <Bell className="w-4 h-4 mr-2" />
             Notifications
           </Button>
+          <Button
+            onClick={() => setActiveTab("info")}
+            variant={activeTab === "info" ? "default" : "ghost"}
+            className={
+              activeTab === "info" ? "bg-accent text-accent-foreground" : ""
+            }
+          >
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+            Info
+          </Button>
         </div>
 
-        {/* Normal Tasks Tab */}
-        {activeTab === "normal" && (
+        {/* Mining Tab */}
+        {activeTab === "mining" && (
           <div>
             <h2 className="text-2xl font-bold flex items-center gap-2 mb-6">
               <Cpu className="w-6 h-6 text-accent" />
-              Mining Tasks
+              Mining Sessions
             </h2>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {normalTasks.map((task) => {
+              {miningTasks.map((task) => {
                 const userCompleted =
                   localStorage.getItem(
                     `user_${user.email}_completed_${task.id}`
@@ -523,23 +541,8 @@ export default function Dashboard() {
                             {task.difficulty.charAt(0).toUpperCase() +
                               task.difficulty.slice(1)}
                           </div>
-                          <div
-                            className={`px-2 py-1 rounded text-xs font-semibold ${
-                              task.type === "mining"
-                                ? "bg-blue-500/20 text-blue-400"
-                                : task.type === "social"
-                                ? "bg-purple-500/20 text-purple-400"
-                                : task.type === "youtube"
-                                ? "bg-red-500/20 text-red-400"
-                                : task.type === "article"
-                                ? "bg-orange-500/20 text-orange-400"
-                                : task.type === "twitter"
-                                ? "bg-sky-500/20 text-sky-400"
-                                : "bg-gray-500/20 text-gray-400"
-                            }`}
-                          >
-                            {task.type.charAt(0).toUpperCase() +
-                              task.type.slice(1)}
+                          <div className="px-2 py-1 rounded text-xs font-semibold bg-blue-500/20 text-blue-400">
+                            Mining
                           </div>
                         </div>
                       </div>
@@ -575,7 +578,110 @@ export default function Dashboard() {
               })}
             </div>
 
-            {normalTasks.length === 0 && (
+            {miningTasks.length === 0 && (
+              <Card className="border-border bg-card p-8 text-center">
+                <p className="text-muted-foreground">
+                  No mining sessions available. Check back later.
+                </p>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Tasks Tab */}
+        {activeTab === "tasks" && (
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2 mb-6">
+              <CheckCircle2 className="w-6 h-6 text-accent" />
+              Tasks
+            </h2>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {otherTasks.map((task) => {
+                const userCompleted =
+                  localStorage.getItem(
+                    `user_${user.email}_completed_${task.id}`
+                  ) === "true";
+                const difficultyColor =
+                  task.difficulty === "easy"
+                    ? "bg-green-500/20 text-green-400"
+                    : task.difficulty === "medium"
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : "bg-red-500/20 text-red-400";
+
+                return (
+                  <Card
+                    key={task.id}
+                    className={`border-border bg-card hover:border-accent/50 transition-colors ${
+                      userCompleted ? "opacity-60" : ""
+                    }`}
+                  >
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold">{task.title}</h3>
+                          <p className="text-muted-foreground text-sm mt-1">
+                            {task.description}
+                          </p>
+                        </div>
+                        <div className="flex gap-1">
+                          <div
+                            className={`px-2 py-1 rounded text-xs font-semibold ${difficultyColor}`}
+                          >
+                            {task.difficulty.charAt(0).toUpperCase() +
+                              task.difficulty.slice(1)}
+                          </div>
+                          <div
+                            className={`px-2 py-1 rounded text-xs font-semibold ${
+                              task.type === "social"
+                                ? "bg-purple-500/20 text-purple-400"
+                                : task.type === "youtube"
+                                ? "bg-red-500/20 text-red-400"
+                                : task.type === "article"
+                                ? "bg-orange-500/20 text-orange-400"
+                                : task.type === "twitter"
+                                ? "bg-sky-500/20 text-sky-400"
+                                : "bg-gray-500/20 text-gray-400"
+                            }`}
+                          >
+                            {task.type.charAt(0).toUpperCase() +
+                              task.type.slice(1)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-border">
+                        <p className="text-muted-foreground text-sm">Reward</p>
+                        <p className="font-semibold text-accent text-lg">
+                          {task.reward} ST
+                        </p>
+                      </div>
+
+                      {!userCompleted ? (
+                        <Link
+                          href={`/mining/${task.id}`}
+                          className="block mt-4"
+                        >
+                          <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                            Start Task
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Button
+                          disabled
+                          className="w-full mt-4 bg-muted text-muted-foreground"
+                        >
+                          Completed ✓
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {otherTasks.length === 0 && (
               <Card className="border-border bg-card p-8 text-center">
                 <p className="text-muted-foreground">
                   No tasks available. Check back later.
@@ -772,6 +878,110 @@ export default function Dashboard() {
               Notifications
             </h2>
             <NotificationsPage userEmail={user.email} />
+          </div>
+        )}
+
+        {/* Info Tab */}
+        {activeTab === "info" && (
+          <div className="space-y-6">
+            {/* Terms & Conditions */}
+            <Card className="border-border bg-card p-8">
+              <h2 className="text-2xl font-bold mb-6">Terms & Conditions</h2>
+
+              <div className="space-y-4 text-sm text-muted-foreground">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">1. Acceptance of Terms</h3>
+                  <p>By accessing and using the Sage Token platform, you accept and agree to be bound by the terms and provision of this agreement.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">2. Mining Sessions</h3>
+                  <p>Mining sessions are time-based activities where users can earn Sage Tokens. Sessions are managed by administrators and may be subject to change.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">3. Token Rewards</h3>
+                  <p>Token rewards are distributed based on completed tasks and mining sessions. All rewards are subject to platform policies and may be adjusted by administrators.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">4. Withdrawals</h3>
+                  <p>Users may withdraw tokens subject to minimum withdrawal limits set by administrators. All withdrawals are processed manually and may take time to complete.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">5. User Conduct</h3>
+                  <p>Users must conduct themselves appropriately and follow all platform rules. Violation of terms may result in account suspension or termination.</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">6. Privacy</h3>
+                  <p>Your privacy is important to us. We collect and use personal information only as described in our Privacy Policy.</p>
+                </div>
+              </div>
+            </Card>
+
+            {/* Roadmap */}
+            <Card className="border-border bg-card p-8">
+              <h2 className="text-2xl font-bold mb-6">Roadmap</h2>
+
+              <div className="space-y-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Phase 1 - Core Mining Platform</h3>
+                    <p className="text-muted-foreground">Basic mining functionality, task completion, and token rewards system.</p>
+                    <p className="text-xs text-green-400 mt-1">✓ Completed</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                    <div className="w-3 h-3 rounded-full bg-blue-400"></div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Phase 2 - Advanced Features</h3>
+                    <p className="text-muted-foreground">AdMob integration, social media tasks, enhanced mining interface with boost functionality.</p>
+                    <p className="text-xs text-blue-400 mt-1">In Progress</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0">
+                    <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Phase 3 - Mobile App</h3>
+                    <p className="text-muted-foreground">Native mobile applications for iOS and Android with enhanced user experience.</p>
+                    <p className="text-xs text-yellow-400 mt-1">Planned</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
+                    <div className="w-3 h-3 rounded-full bg-purple-400"></div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Phase 4 - DeFi Integration</h3>
+                    <p className="text-muted-foreground">Integration with decentralized exchanges, staking, and yield farming opportunities.</p>
+                    <p className="text-xs text-purple-400 mt-1">Future</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
+                    <div className="w-3 h-3 rounded-full bg-orange-400"></div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">Phase 5 - Global Expansion</h3>
+                    <p className="text-muted-foreground">Multi-language support, global partnerships, and expanded market reach.</p>
+                    <p className="text-xs text-orange-400 mt-1">Future</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
         )}
       </div>

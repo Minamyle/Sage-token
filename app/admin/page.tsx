@@ -84,6 +84,7 @@ interface Announcement {
 }
 
 export default function AdminPanel() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
@@ -122,6 +123,16 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<
     "tasks" | "users" | "withdrawals" | "announcements" | "settings"
   >("tasks");
+
+  useEffect(() => {
+    // Check admin authentication
+    const authenticated = localStorage.getItem("adminAuthenticated") === "true";
+    if (!authenticated) {
+      window.location.href = "/sageadmin";
+      return;
+    }
+    setIsAuthenticated(true);
+  }, []);
 
   useEffect(() => {
     // Load tasks from localStorage
@@ -432,13 +443,24 @@ export default function AdminPanel() {
     });
   };
 
+  if (!isAuthenticated) {
+    return (
+      <main className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <Card className="border-border bg-card p-8 text-center">
+          <p className="text-muted-foreground">Verifying admin access...</p>
+        </Card>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Zap className="w-8 h-8 text-accent" />
+            {/* <Zap className="w-8 h-8 text-accent" /> */}
+            <img src="./sage.jpeg" alt="logo" className="w-8 h-8" />
             <span className="text-2xl font-bold">Admin Panel</span>
           </div>
           <Link href="/dashboard">

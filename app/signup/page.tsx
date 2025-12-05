@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import Link from "next/link"
-import { Zap } from "lucide-react"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import Link from "next/link";
+import { Zap } from "lucide-react";
 
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
@@ -17,31 +17,36 @@ export default function SignUpPage() {
     confirmPassword: "",
     walletId: "",
     referralCode: "", // added referral code field
-  })
-  const [error, setError] = useState("")
+  });
+  const [error, setError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-    setError("")
-  }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setError("");
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!formData.fullName || !formData.email || !formData.password || !formData.walletId) {
-      setError("All fields are required")
-      return
+    if (
+      !formData.fullName ||
+      !formData.email ||
+      !formData.password ||
+      !formData.walletId
+    ) {
+      setError("All fields are required");
+      return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match")
-      return
+      setError("Passwords do not match");
+      return;
     }
 
     if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters")
-      return
+      setError("Password must be at least 8 characters");
+      return;
     }
 
     // Save to localStorage for demo
@@ -52,17 +57,17 @@ export default function SignUpPage() {
         email: formData.email,
         walletId: formData.walletId,
         tokenBalance: 0,
-      }),
-    )
-    localStorage.setItem("isLoggedIn", "true")
+      })
+    );
+    localStorage.setItem("isLoggedIn", "true");
 
     if (formData.referralCode) {
       // Find referrer by referral code
-      const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]")
+      const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]");
       const referrer = allUsers.find((u: any) => {
-        const refCode = localStorage.getItem(`referralCode_${u.email}`)
-        return refCode === formData.referralCode
-      })
+        const refCode = localStorage.getItem(`referralCode_${u.email}`);
+        return refCode === formData.referralCode;
+      });
 
       if (referrer) {
         const referralData = {
@@ -73,26 +78,31 @@ export default function SignUpPage() {
           status: "pending",
           rewardAmount: 100,
           timestamp: Date.now(),
-        }
+        };
 
-        const referralsStr = localStorage.getItem(`referrals_${referrer.email}`)
-        const referrals = referralsStr ? JSON.parse(referralsStr) : []
-        referrals.push(referralData)
-        localStorage.setItem(`referrals_${referrer.email}`, JSON.stringify(referrals))
+        const referralsStr = localStorage.getItem(
+          `referrals_${referrer.email}`
+        );
+        const referrals = referralsStr ? JSON.parse(referralsStr) : [];
+        referrals.push(referralData);
+        localStorage.setItem(
+          `referrals_${referrer.email}`,
+          JSON.stringify(referrals)
+        );
       }
     }
 
-    const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]")
+    const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]");
     allUsers.push({
       fullName: formData.fullName,
       email: formData.email,
       walletId: formData.walletId,
       tokenBalance: 0,
-    })
-    localStorage.setItem("allUsers", JSON.stringify(allUsers))
+    });
+    localStorage.setItem("allUsers", JSON.stringify(allUsers));
 
-    window.location.href = "/dashboard"
-  }
+    window.location.href = "/dashboard";
+  };
 
   return (
     <main className="min-h-screen bg-background text-foreground flex items-center justify-center px-6 py-12">
@@ -109,16 +119,23 @@ export default function SignUpPage() {
       <Card className="w-full max-w-md border-border bg-card">
         <div className="p-8">
           <div className="flex items-center justify-center gap-2 mb-8">
-            <Zap className="w-8 h-8 text-accent" />
+            {/* <Zap className="w-8 h-8 text-accent" /> */}
+            <img src="./sage.jpeg" alt="logo" className="w-8 h-8" />
             <span className="text-2xl font-bold">Sage Token</span>
           </div>
 
-          <h1 className="text-2xl font-bold mb-2 text-center">Create Account</h1>
-          <p className="text-muted-foreground text-center mb-6">Start mining and earning tokens</p>
+          <h1 className="text-2xl font-bold mb-2 text-center">
+            Create Account
+          </h1>
+          <p className="text-muted-foreground text-center mb-6">
+            Start mining and earning tokens
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-foreground">Full Name</label>
+              <label className="text-sm font-medium text-foreground">
+                Full Name
+              </label>
               <Input
                 type="text"
                 name="fullName"
@@ -130,7 +147,9 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground">Email</label>
+              <label className="text-sm font-medium text-foreground">
+                Email
+              </label>
               <Input
                 type="email"
                 name="email"
@@ -142,7 +161,9 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground">Wallet ID</label>
+              <label className="text-sm font-medium text-foreground">
+                Wallet ID
+              </label>
               <Input
                 type="text"
                 name="walletId"
@@ -154,7 +175,9 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground">Password</label>
+              <label className="text-sm font-medium text-foreground">
+                Password
+              </label>
               <Input
                 type="password"
                 name="password"
@@ -166,7 +189,9 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground">Confirm Password</label>
+              <label className="text-sm font-medium text-foreground">
+                Confirm Password
+              </label>
               <Input
                 type="password"
                 name="confirmPassword"
@@ -178,7 +203,9 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground">Referral Code (Optional)</label>
+              <label className="text-sm font-medium text-foreground">
+                Referral Code (Optional)
+              </label>
               <Input
                 type="text"
                 name="referralCode"
@@ -195,7 +222,10 @@ export default function SignUpPage() {
               </div>
             )}
 
-            <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 mt-6">
+            <Button
+              type="submit"
+              className="w-full bg-accent text-accent-foreground hover:bg-accent/90 mt-6"
+            >
               Create Account
             </Button>
           </form>
@@ -209,5 +239,5 @@ export default function SignUpPage() {
         </div>
       </Card>
     </main>
-  )
+  );
 }

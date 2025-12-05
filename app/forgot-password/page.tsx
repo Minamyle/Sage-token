@@ -35,7 +35,8 @@ export default function ForgotPasswordPage() {
       <Card className="w-full max-w-md border-border bg-card">
         <div className="p-8">
           <div className="flex items-center justify-center gap-2 mb-8">
-            <Zap className="w-8 h-8 text-accent" />
+            {/* <Zap className="w-8 h-8 text-accent" /> */}
+             <img src="./sage.jpeg" alt="logo" className="w-8 h-8" />
             <span className="text-2xl font-bold">Sage Token</span>
           </div>
 
