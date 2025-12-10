@@ -5,6 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Zap,
   LogOut,
   Wallet,
@@ -15,6 +26,7 @@ import {
   ArrowRight,
   Send,
   Bell,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { ToastContainer } from "@/components/notification-toast";
@@ -72,6 +84,7 @@ interface Stats {
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [stats, setStats] = useState<Stats>({
     tasksCompleted: 0,
     totalEarned: 0,
@@ -79,7 +92,13 @@ export default function Dashboard() {
     totalCompleted: 0,
   });
   const [activeTab, setActiveTab] = useState<
-    "mining" | "tasks" | "withdraw" | "referrals" | "notifications" | "info"
+    | "mining"
+    | "tasks"
+    | "withdraw"
+    | "referrals"
+    | "notifications"
+    | "info"
+    | "settings"
   >("mining");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
@@ -93,6 +112,9 @@ export default function Dashboard() {
     exchangeRate: 0.1,
     minWithdrawal: 100,
   });
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const { toasts, removeToast, showSuccess, showError } = useNotifications();
 
   useEffect(() => {
@@ -101,6 +123,14 @@ export default function Dashboard() {
     if (userStr) {
       const userData = JSON.parse(userStr);
       setUser(userData);
+
+      // Load completed tasks
+      const completedTasksIds = localStorage.getItem(
+        `completedTasks_${userData.email}`
+      );
+      if (completedTasksIds) {
+        setCompletedTasks(JSON.parse(completedTasksIds));
+      }
 
       // Generate referral code if not exists
       let refCode = localStorage.getItem(`referralCode_${userData.email}`);
@@ -201,29 +231,68 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Calculate stats from user completed tasks
-    if (user) {
-      const completedTasksIds = localStorage.getItem(
-        `completedTasks_${user.email}`
+    if (user && tasks.length > 0) {
+      const totalRewards = completedTasks.reduce(
+        (sum: number, taskId: string) => {
+          const task = tasks.find((t) => t.id === taskId);
+          return sum + (task?.reward || 0);
+        },
+        0
       );
-      const completed = completedTasksIds ? JSON.parse(completedTasksIds) : [];
-      const totalRewards = completed.reduce((sum: number, taskId: string) => {
-        const task = tasks.find((t) => t.id === taskId);
-        return sum + (task?.reward || 0);
-      }, 0);
 
       setStats({
-        tasksCompleted: completed.length,
+        tasksCompleted: completedTasks.length,
         totalEarned: totalRewards,
-        currentStreak: completed.length,
+        currentStreak: completedTasks.length,
         totalCompleted: tasks.length,
       });
     }
-  }, [user, tasks]);
+  }, [user, tasks, completedTasks]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("isLoggedIn");
     showSuccess("Logged Out", "You have been successfully logged out");
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 1000);
+  };
+
+  const handleDeleteAccount = () => {
+    if (!user) return;
+
+    // Remove user from allUsers
+    const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]");
+    const updatedAllUsers = allUsers.filter((u: any) => u.email !== user.email);
+    localStorage.setItem("allUsers", JSON.stringify(updatedAllUsers));
+
+    // Remove all user-specific data
+    const keysToRemove = [
+      "user",
+      "isLoggedIn",
+      `user_profile_${user.email}`,
+      `completedTasks_${user.email}`,
+      `withdrawals_${user.email}`,
+      `notifications_${user.email}`,
+      `referrals_${user.email}`,
+      `referralRewards_${user.email}`,
+      `referralCode_${user.email}`,
+    ];
+
+    // Also remove mining sessions
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach((key) => {
+      if (key.startsWith(`mining_session_${user.email}_`)) {
+        localStorage.removeItem(key);
+      }
+      if (key.startsWith(`user_${user.email}_completed_`)) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+    showSuccess("Account Deleted", "Your account has been permanently deleted");
     setTimeout(() => {
       window.location.href = "/";
     }, 1000);
@@ -319,6 +388,60 @@ export default function Dashboard() {
     showSuccess("Copied!", "Referral code copied to clipboard");
   };
 
+  const handleChangePassword = () => {
+    if (!user) return;
+
+    // Get user password from localStorage
+    const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]");
+    const currentUserData = allUsers.find((u: any) => u.email === user.email);
+
+    if (!currentUserData) {
+      showError("Error", "User data not found");
+      return;
+    }
+
+    if (currentPassword !== currentUserData.password) {
+      showError("Error", "Current password is incorrect");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      showError("Error", "New password must be at least 6 characters long");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showError("Error", "New passwords do not match");
+      return;
+    }
+
+    // Update password in allUsers
+    const updatedAllUsers = allUsers.map((u: any) =>
+      u.email === user.email ? { ...u, password: newPassword } : u
+    );
+    localStorage.setItem("allUsers", JSON.stringify(updatedAllUsers));
+
+    // Update password in user_profile if exists
+    const userProfileStr = localStorage.getItem(`user_profile_${user.email}`);
+    if (userProfileStr) {
+      const userProfile = JSON.parse(userProfileStr);
+      userProfile.password = newPassword;
+      localStorage.setItem(
+        `user_profile_${user.email}`,
+        JSON.stringify(userProfile)
+      );
+    }
+
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+
+    showSuccess(
+      "Password Changed",
+      "Your password has been successfully updated"
+    );
+  };
+
   if (!user) return null;
 
   const miningTasks = tasks.filter((task) => task.type === "mining");
@@ -333,7 +456,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* <Zap className="w-8 h-8 text-accent" /> */}
-             <img src="./sage.jpeg" alt="logo" className="w-8 h-8" />
+            <img src="./sage.jpeg" alt="logo" className="w-8 h-8" />
             <span className="text-2xl font-bold">Sage Token</span>
           </div>
           <div className="flex items-center gap-4">
@@ -376,7 +499,39 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            {/* Admin access removed from user interface - access via /sageadmin */}
+            <div className="flex gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete your account? This action
+                      cannot be undone. All your data, balance, and progress
+                      will be permanently removed.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAccount}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete Account
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </Card>
 
@@ -487,6 +642,16 @@ export default function Dashboard() {
             Notifications
           </Button>
           <Button
+            onClick={() => setActiveTab("settings")}
+            variant={activeTab === "settings" ? "default" : "ghost"}
+            className={
+              activeTab === "settings" ? "bg-accent text-accent-foreground" : ""
+            }
+          >
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+            Settings
+          </Button>
+          <Button
             onClick={() => setActiveTab("info")}
             variant={activeTab === "info" ? "default" : "ghost"}
             className={
@@ -507,54 +672,51 @@ export default function Dashboard() {
             </h2>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {miningTasks.map((task) => {
-                const userCompleted =
-                  localStorage.getItem(
-                    `user_${user.email}_completed_${task.id}`
-                  ) === "true";
-                const difficultyColor =
-                  task.difficulty === "easy"
-                    ? "bg-green-500/20 text-green-400"
-                    : task.difficulty === "medium"
-                    ? "bg-yellow-500/20 text-yellow-400"
-                    : "bg-red-500/20 text-red-400";
+              {miningTasks
+                .filter((task) => !completedTasks.includes(task.id))
+                .map((task) => {
+                  const difficultyColor =
+                    task.difficulty === "easy"
+                      ? "bg-green-500/20 text-green-400"
+                      : task.difficulty === "medium"
+                      ? "bg-yellow-500/20 text-yellow-400"
+                      : "bg-red-500/20 text-red-400";
 
-                return (
-                  <Card
-                    key={task.id}
-                    className={`border-border bg-card hover:border-accent/50 transition-colors ${
-                      userCompleted ? "opacity-60" : ""
-                    }`}
-                  >
-                    <div className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold">{task.title}</h3>
-                          <p className="text-muted-foreground text-sm mt-1">
-                            {task.description}
+                  return (
+                    <Card
+                      key={task.id}
+                      className="border-border bg-card hover:border-accent/50 transition-colors"
+                    >
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold">{task.title}</h3>
+                            <p className="text-muted-foreground text-sm mt-1">
+                              {task.description}
+                            </p>
+                          </div>
+                          <div className="flex gap-1">
+                            <div
+                              className={`px-2 py-1 rounded text-xs font-semibold ${difficultyColor}`}
+                            >
+                              {task.difficulty.charAt(0).toUpperCase() +
+                                task.difficulty.slice(1)}
+                            </div>
+                            <div className="px-2 py-1 rounded text-xs font-semibold bg-blue-500/20 text-blue-400">
+                              Mining
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-border">
+                          <p className="text-muted-foreground text-sm">
+                            Reward
+                          </p>
+                          <p className="font-semibold text-accent text-lg">
+                            {task.reward} ST
                           </p>
                         </div>
-                        <div className="flex gap-1">
-                          <div
-                            className={`px-2 py-1 rounded text-xs font-semibold ${difficultyColor}`}
-                          >
-                            {task.difficulty.charAt(0).toUpperCase() +
-                              task.difficulty.slice(1)}
-                          </div>
-                          <div className="px-2 py-1 rounded text-xs font-semibold bg-blue-500/20 text-blue-400">
-                            Mining
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center justify-between pt-4 border-t border-border">
-                        <p className="text-muted-foreground text-sm">Reward</p>
-                        <p className="font-semibold text-accent text-lg">
-                          {task.reward} ST
-                        </p>
-                      </div>
-
-                      {!userCompleted ? (
                         <Link
                           href={`/mining/${task.id}`}
                           className="block mt-4"
@@ -564,21 +726,14 @@ export default function Dashboard() {
                             <ArrowRight className="w-4 h-4 ml-2" />
                           </Button>
                         </Link>
-                      ) : (
-                        <Button
-                          disabled
-                          className="w-full mt-4 bg-muted text-muted-foreground"
-                        >
-                          Completed ✓
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
+                      </div>
+                    </Card>
+                  );
+                })}
             </div>
 
-            {miningTasks.length === 0 && (
+            {miningTasks.filter((task) => !completedTasks.includes(task.id))
+              .length === 0 && (
               <Card className="border-border bg-card p-8 text-center">
                 <p className="text-muted-foreground">
                   No mining sessions available. Check back later.
@@ -598,10 +753,7 @@ export default function Dashboard() {
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {otherTasks.map((task) => {
-                const userCompleted =
-                  localStorage.getItem(
-                    `user_${user.email}_completed_${task.id}`
-                  ) === "true";
+                const userCompleted = completedTasks.includes(task.id);
                 const difficultyColor =
                   task.difficulty === "easy"
                     ? "bg-green-500/20 text-green-400"
@@ -881,6 +1033,70 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Settings Tab */}
+        {activeTab === "settings" && (
+          <div className="space-y-6">
+            <Card className="border-border bg-card p-8">
+              <h2 className="text-2xl font-bold mb-6">Account Settings</h2>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground mb-4">
+                    Change Password
+                  </h3>
+                  <div className="space-y-4 max-w-md">
+                    <div>
+                      <label className="text-sm font-medium text-foreground">
+                        Current Password
+                      </label>
+                      <Input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Enter current password"
+                        className="mt-2 bg-input border-border text-foreground"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-foreground">
+                        New Password
+                      </label>
+                      <Input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Enter new password"
+                        className="mt-2 bg-input border-border text-foreground"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-foreground">
+                        Confirm New Password
+                      </label>
+                      <Input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                        className="mt-2 bg-input border-border text-foreground"
+                      />
+                    </div>
+
+                    <Button
+                      onClick={handleChangePassword}
+                      className="bg-accent text-accent-foreground hover:bg-accent/90"
+                    >
+                      Change Password
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Info Tab */}
         {activeTab === "info" && (
           <div className="space-y-6">
@@ -890,33 +1106,68 @@ export default function Dashboard() {
 
               <div className="space-y-4 text-sm text-muted-foreground">
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">1. Acceptance of Terms</h3>
-                  <p>By accessing and using the Sage Token platform, you accept and agree to be bound by the terms and provision of this agreement.</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    1. Acceptance of Terms
+                  </h3>
+                  <p>
+                    By accessing and using the Sage Token platform, you accept
+                    and agree to be bound by the terms and provision of this
+                    agreement.
+                  </p>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">2. Mining Sessions</h3>
-                  <p>Mining sessions are time-based activities where users can earn Sage Tokens. Sessions are managed by administrators and may be subject to change.</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    2. Mining Sessions
+                  </h3>
+                  <p>
+                    Mining sessions are time-based activities where users can
+                    earn Sage Tokens. Sessions are managed by administrators and
+                    may be subject to change.
+                  </p>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">3. Token Rewards</h3>
-                  <p>Token rewards are distributed based on completed tasks and mining sessions. All rewards are subject to platform policies and may be adjusted by administrators.</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    3. Token Rewards
+                  </h3>
+                  <p>
+                    Token rewards are distributed based on completed tasks and
+                    mining sessions. All rewards are subject to platform
+                    policies and may be adjusted by administrators.
+                  </p>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">4. Withdrawals</h3>
-                  <p>Users may withdraw tokens subject to minimum withdrawal limits set by administrators. All withdrawals are processed manually and may take time to complete.</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    4. Withdrawals
+                  </h3>
+                  <p>
+                    Users may withdraw tokens subject to minimum withdrawal
+                    limits set by administrators. All withdrawals are processed
+                    manually and may take time to complete.
+                  </p>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">5. User Conduct</h3>
-                  <p>Users must conduct themselves appropriately and follow all platform rules. Violation of terms may result in account suspension or termination.</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    5. User Conduct
+                  </h3>
+                  <p>
+                    Users must conduct themselves appropriately and follow all
+                    platform rules. Violation of terms may result in account
+                    suspension or termination.
+                  </p>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">6. Privacy</h3>
-                  <p>Your privacy is important to us. We collect and use personal information only as described in our Privacy Policy.</p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    6. Privacy
+                  </h3>
+                  <p>
+                    Your privacy is important to us. We collect and use personal
+                    information only as described in our Privacy Policy.
+                  </p>
                 </div>
               </div>
             </Card>
@@ -931,8 +1182,13 @@ export default function Dashboard() {
                     <CheckCircle2 className="w-4 h-4 text-green-400" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground">Phase 1 - Core Mining Platform</h3>
-                    <p className="text-muted-foreground">Basic mining functionality, task completion, and token rewards system.</p>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      Phase 1 - Core Mining Platform
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Basic mining functionality, task completion, and token
+                      rewards system.
+                    </p>
                     <p className="text-xs text-green-400 mt-1">✓ Completed</p>
                   </div>
                 </div>
@@ -942,8 +1198,13 @@ export default function Dashboard() {
                     <div className="w-3 h-3 rounded-full bg-blue-400"></div>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground">Phase 2 - Advanced Features</h3>
-                    <p className="text-muted-foreground">AdMob integration, social media tasks, enhanced mining interface with boost functionality.</p>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      Phase 2 - Advanced Features
+                    </h3>
+                    <p className="text-muted-foreground">
+                      AdMob integration, social media tasks, enhanced mining
+                      interface with boost functionality.
+                    </p>
                     <p className="text-xs text-blue-400 mt-1">In Progress</p>
                   </div>
                 </div>
@@ -953,8 +1214,13 @@ export default function Dashboard() {
                     <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground">Phase 3 - Mobile App</h3>
-                    <p className="text-muted-foreground">Native mobile applications for iOS and Android with enhanced user experience.</p>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      Phase 3 - Mobile App
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Native mobile applications for iOS and Android with
+                      enhanced user experience.
+                    </p>
                     <p className="text-xs text-yellow-400 mt-1">Planned</p>
                   </div>
                 </div>
@@ -964,8 +1230,13 @@ export default function Dashboard() {
                     <div className="w-3 h-3 rounded-full bg-purple-400"></div>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground">Phase 4 - DeFi Integration</h3>
-                    <p className="text-muted-foreground">Integration with decentralized exchanges, staking, and yield farming opportunities.</p>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      Phase 4 - DeFi Integration
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Integration with decentralized exchanges, staking, and
+                      yield farming opportunities.
+                    </p>
                     <p className="text-xs text-purple-400 mt-1">Future</p>
                   </div>
                 </div>
@@ -975,8 +1246,13 @@ export default function Dashboard() {
                     <div className="w-3 h-3 rounded-full bg-orange-400"></div>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground">Phase 5 - Global Expansion</h3>
-                    <p className="text-muted-foreground">Multi-language support, global partnerships, and expanded market reach.</p>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      Phase 5 - Global Expansion
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Multi-language support, global partnerships, and expanded
+                      market reach.
+                    </p>
                     <p className="text-xs text-orange-400 mt-1">Future</p>
                   </div>
                 </div>

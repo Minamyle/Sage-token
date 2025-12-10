@@ -123,6 +123,9 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<
     "tasks" | "users" | "withdrawals" | "announcements" | "settings"
   >("tasks");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     // Check admin authentication
@@ -441,6 +444,32 @@ export default function AdminPanel() {
         );
       }
     });
+  };
+
+  const handleChangeAdminPassword = () => {
+    const currentAdminPassword =
+      localStorage.getItem("adminPassword") || "SageAdmin2025!";
+
+    if (currentPassword !== currentAdminPassword) {
+      alert("Current password is incorrect");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      alert("New password must be at least 8 characters long");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      alert("New passwords do not match");
+      return;
+    }
+
+    localStorage.setItem("adminPassword", newPassword);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    alert("Admin password changed successfully!");
   };
 
   if (!isAuthenticated) {
@@ -1483,6 +1512,60 @@ export default function AdminPanel() {
                       mining sessions
                     </p>
                   </div>
+                </div>
+              </Card>
+
+              {/* Admin Password Change */}
+              <Card className="border-border bg-card p-6">
+                <h3 className="text-lg font-bold mb-4">
+                  Change Admin Password
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">
+                      Current Password
+                    </label>
+                    <Input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Enter current password"
+                      className="mt-2 bg-input border-border text-foreground"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-foreground">
+                      New Password
+                    </label>
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      className="mt-2 bg-input border-border text-foreground"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-foreground">
+                      Confirm New Password
+                    </label>
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      className="mt-2 bg-input border-border text-foreground"
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleChangeAdminPassword}
+                    className="bg-accent text-accent-foreground hover:bg-accent/90"
+                  >
+                    Change Password
+                  </Button>
                 </div>
               </Card>
             </div>

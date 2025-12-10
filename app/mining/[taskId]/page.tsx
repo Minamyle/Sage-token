@@ -144,6 +144,19 @@ export default function MiningPage() {
     );
     localStorage.removeItem(`mining_session_${userEmail}_${taskId}`);
 
+    // Mark task as completed
+    localStorage.setItem(`user_${userEmail}_completed_${taskId}`, "true");
+
+    const completedTasksIds = localStorage.getItem(
+      `completedTasks_${userEmail}`
+    );
+    const completed = completedTasksIds ? JSON.parse(completedTasksIds) : [];
+    completed.push(taskId);
+    localStorage.setItem(
+      `completedTasks_${userEmail}`,
+      JSON.stringify(completed)
+    );
+
     createNotification(
       userEmail,
       "task",

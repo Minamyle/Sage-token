@@ -15,8 +15,9 @@ export default function AdminLogin() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Simple password check - in production, this should be more secure
-    const adminPassword = "SageAdmin2025!"; // This should be stored securely
+    // Get admin password from localStorage, default to hardcoded
+    const adminPassword =
+      localStorage.getItem("adminPassword") || "SageAdmin2025!";
 
     if (password === adminPassword) {
       localStorage.setItem("adminAuthenticated", "true");

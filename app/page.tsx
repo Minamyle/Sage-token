@@ -66,7 +66,7 @@ export default function LandingPage() {
       <nav className="flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-2">
           {/* <Zap className="w-8 h-8 text-accent" /> */}
-           <img src="./sage.jpeg" alt="logo" className="w-8 h-8" />
+          <img src="./sage.jpeg" alt="logo" className="w-8 h-8" />
           <span className="text-2xl font-bold bg-linear-to-r from-accent to-primary bg-clip-text text-transparent">
             Sage Token
           </span>
