@@ -38,6 +38,8 @@ interface MiningSession {
   reward: number;
   isActive: boolean;
   boosted: boolean;
+  boostLevel: number; // 0-20x
+  timeReduction: number; // in seconds
 }
 
 export default function MiningPage() {
@@ -52,6 +54,8 @@ export default function MiningPage() {
   const [progress, setProgress] = useState<number>(0);
   const [isMining, setIsMining] = useState(false);
   const [canBoost, setCanBoost] = useState(false);
+  const [showAdModal, setShowAdModal] = useState(false);
+  const [boostCount, setBoostCount] = useState(0);
   const { toasts, removeToast, showSuccess, showError } = useNotifications();
 
   const createNotification = (
@@ -88,10 +92,13 @@ export default function MiningPage() {
       reward: task.reward,
       isActive: true,
       boosted: false,
+      boostLevel: 0,
+      timeReduction: 0,
     };
 
     setMiningSession(session);
     setIsMining(true);
+    setBoostCount(0);
     localStorage.setItem(
       `mining_session_${user.email}_${taskId}`,
       JSON.stringify(session)
@@ -104,23 +111,50 @@ export default function MiningPage() {
   };
 
   const boostMining = () => {
-    if (!miningSession || !user) return;
+    if (!miningSession || !user || boostCount >= 20) return;
 
-    // Simulate watching an ad
-    showSuccess("Ad Watched", "Mining rate boosted! +50% reward");
+    // Show ad modal
+    setShowAdModal(true);
+  };
 
-    const boostedSession = {
+  const handleAdWatched = () => {
+    if (!miningSession || !user || boostCount >= 20) return;
+
+    const newBoostCount = boostCount + 1;
+    const boostMultiplier = 1 + newBoostCount * 0.1; // 1.1x, 1.2x, ... 3.0x (20x total)
+    const newTimeReduction = newBoostCount * 2; // 2 seconds per boost
+
+    const boostedSession: MiningSession = {
       ...miningSession,
-      reward: miningSession.reward * 1.5,
-      boosted: true,
+      reward: Math.floor(task!.reward * boostMultiplier),
+      boosted: newBoostCount > 0,
+      boostLevel: newBoostCount,
+      timeReduction: newTimeReduction,
+      endTime: miningSession.endTime - newTimeReduction * 1000, // Reduce time by 2 seconds per boost
     };
 
     setMiningSession(boostedSession);
+    setBoostCount(newBoostCount);
+    setShowAdModal(false);
     localStorage.setItem(
       `mining_session_${user.email}_${taskId}`,
       JSON.stringify(boostedSession)
     );
-    setCanBoost(false);
+
+    const multiplierDisplay = (boostMultiplier * 10).toFixed(0);
+    showSuccess(
+      "Boost Applied!",
+      `Mining boosted to ${multiplierDisplay}% reward. ${
+        20 - newBoostCount
+      } more boosts available!`
+    );
+
+    if (newBoostCount >= 20) {
+      showSuccess(
+        "Max Boost Reached!",
+        "You've reached the maximum 20x boost multiplier!"
+      );
+    }
   };
 
   const completeMiningSession = (session: MiningSession, userEmail: string) => {
@@ -252,6 +286,57 @@ export default function MiningPage() {
       <main className="min-h-screen bg-linear-to-b from-slate-900 via-slate-800 to-slate-900 text-foreground flex flex-col">
         <ToastContainer toasts={toasts} onClose={removeToast} />
 
+        {/* Ad Modal */}
+        {showAdModal && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
+            <Card className="border-blue-500/40 bg-slate-800/90 p-8 max-w-md text-center">
+              <div className="mb-6">
+                <div className="w-24 h-24 mx-auto mb-4 bg-accent/20 rounded-full flex items-center justify-center">
+                  <span className="text-5xl">📺</span>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Watch Ad</h3>
+                <p className="text-blue-300 text-sm">
+                  Watch a 5-second advertisement to boost your mining rewards!
+                </p>
+              </div>
+
+              <div className="bg-slate-900/50 border border-blue-500/30 rounded-lg p-4 mb-6">
+                <p className="text-xs text-blue-300 mb-2">CURRENT BOOST LEVEL</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-3xl font-bold text-blue-400">
+                    {boostCount + 1}x
+                  </span>
+                  <span className="text-xs text-blue-300">
+                    {boostCount}/20 boosts used
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-blue-500/20 rounded-full mt-3">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all"
+                    style={{ width: `${(boostCount / 20) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  onClick={handleAdWatched}
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-6 text-base"
+                >
+                  Watch Ad (5 sec)
+                </Button>
+                <Button
+                  onClick={() => setShowAdModal(false)}
+                  variant="ghost"
+                  className="w-full text-blue-300 hover:text-blue-200"
+                >
+                  Skip
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
         <header className="sticky top-0 z-10 border-b border-blue-500/20 bg-slate-900/80 backdrop-blur-md">
           <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
             <h1 className="text-xl font-bold text-white">Sage Mining</h1>
@@ -288,9 +373,9 @@ export default function MiningPage() {
                 <span className="text-sm text-blue-300 font-semibold uppercase tracking-widest">
                   Mining Reward
                 </span>
-                {miningSession?.boosted && (
+                {miningSession && miningSession.boostLevel > 0 && (
                   <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
-                    BOOSTED
+                    {miningSession.boostLevel}x BOOSTED
                   </span>
                 )}
               </div>
@@ -300,6 +385,11 @@ export default function MiningPage() {
                 </span>
                 <span className="text-3xl font-bold text-blue-300">ST</span>
               </div>
+              {miningSession && miningSession.boostLevel > 0 && (
+                <p className="text-xs text-yellow-400 mt-2">
+                  +{miningSession.timeReduction}s time reduction
+                </p>
+              )}
             </div>
 
             <div className="relative w-80 h-80 mx-auto mb-8">
@@ -397,16 +487,13 @@ export default function MiningPage() {
                 <>
                   <Button
                     onClick={boostMining}
-                    disabled={!canBoost}
+                    disabled={boostCount >= 20}
                     size="lg"
                     className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white text-base font-bold py-7 rounded-2xl shadow-lg shadow-yellow-500/50 transition-all hover:shadow-yellow-500/80 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Rocket className="w-5 h-5 mr-2" />
-                    Boost (+50%)
+                    Boost ({boostCount}/20)
                   </Button>
-                  <div className="text-xs text-center text-blue-300 mt-2">
-                    Watch ad to unlock boost
-                  </div>
                 </>
               )}
             </div>
@@ -414,8 +501,13 @@ export default function MiningPage() {
             {isMining && (
               <div className="mt-4 text-center">
                 <p className="text-xs text-blue-300">
-                  Mining in progress... Ads will show at random intervals
+                  Watch ads to boost mining up to 20x! Each boost adds +10% reward and reduces time by 2 seconds.
                 </p>
+                {boostCount >= 20 && (
+                  <p className="text-xs text-yellow-400 mt-2 font-semibold">
+                    Maximum boost level reached!
+                  </p>
+                )}
               </div>
             )}
           </div>

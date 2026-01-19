@@ -27,11 +27,14 @@ import {
   Send,
   Bell,
   Trash2,
+  MessageCircle,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { ToastContainer } from "@/components/notification-toast";
 import { useNotifications } from "@/hooks/use-notifications";
 import { NotificationsPage } from "@/components/notifications-page";
+import { ChatCenter } from "@/components/chat-center";
 
 interface Task {
   id: string;
@@ -98,6 +101,8 @@ export default function Dashboard() {
     | "referrals"
     | "notifications"
     | "info"
+    | "whitepaper"
+    | "chat"
     | "settings"
   >("mining");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
@@ -112,6 +117,7 @@ export default function Dashboard() {
     exchangeRate: 0.1,
     minWithdrawal: 100,
   });
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -225,6 +231,21 @@ export default function Dashboard() {
         setSettings(JSON.parse(settingsStr));
       } catch {
         // Keep default settings
+      }
+    }
+
+    // Load notifications
+    if (userStr) {
+      const userEmail = JSON.parse(userStr).email;
+      const notificationsStr = localStorage.getItem(
+        `notifications_${userEmail}`
+      );
+      if (notificationsStr) {
+        try {
+          setNotifications(JSON.parse(notificationsStr));
+        } catch {
+          setNotifications([]);
+        }
       }
     }
   }, []);
@@ -640,6 +661,21 @@ export default function Dashboard() {
           >
             <Bell className="w-4 h-4 mr-2" />
             Notifications
+            {notifications.filter((n) => !n.read).length > 0 && (
+              <span className="ml-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                {notifications.filter((n) => !n.read).length}
+              </span>
+            )}
+          </Button>
+          <Button
+            onClick={() => setActiveTab("chat")}
+            variant={activeTab === "chat" ? "default" : "ghost"}
+            className={
+              activeTab === "chat" ? "bg-accent text-accent-foreground" : ""
+            }
+          >
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Chat
           </Button>
           <Button
             onClick={() => setActiveTab("settings")}
@@ -661,6 +697,18 @@ export default function Dashboard() {
             <CheckCircle2 className="w-4 h-4 mr-2" />
             Info
           </Button>
+          <Button
+            onClick={() => setActiveTab("whitepaper")}
+            variant={activeTab === "whitepaper" ? "default" : "ghost"}
+            className={
+              activeTab === "whitepaper"
+                ? "bg-accent text-accent-foreground"
+                : ""
+            }
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Whitepaper
+          </Button>
         </div>
 
         {/* Mining Tab */}
@@ -679,8 +727,8 @@ export default function Dashboard() {
                     task.difficulty === "easy"
                       ? "bg-green-500/20 text-green-400"
                       : task.difficulty === "medium"
-                      ? "bg-yellow-500/20 text-yellow-400"
-                      : "bg-red-500/20 text-red-400";
+                        ? "bg-yellow-500/20 text-yellow-400"
+                        : "bg-red-500/20 text-red-400";
 
                   return (
                     <Card
@@ -758,8 +806,8 @@ export default function Dashboard() {
                   task.difficulty === "easy"
                     ? "bg-green-500/20 text-green-400"
                     : task.difficulty === "medium"
-                    ? "bg-yellow-500/20 text-yellow-400"
-                    : "bg-red-500/20 text-red-400";
+                      ? "bg-yellow-500/20 text-yellow-400"
+                      : "bg-red-500/20 text-red-400";
 
                 return (
                   <Card
@@ -788,12 +836,12 @@ export default function Dashboard() {
                               task.type === "social"
                                 ? "bg-purple-500/20 text-purple-400"
                                 : task.type === "youtube"
-                                ? "bg-red-500/20 text-red-400"
-                                : task.type === "article"
-                                ? "bg-orange-500/20 text-orange-400"
-                                : task.type === "twitter"
-                                ? "bg-sky-500/20 text-sky-400"
-                                : "bg-gray-500/20 text-gray-400"
+                                  ? "bg-red-500/20 text-red-400"
+                                  : task.type === "article"
+                                    ? "bg-orange-500/20 text-orange-400"
+                                    : task.type === "twitter"
+                                      ? "bg-sky-500/20 text-sky-400"
+                                      : "bg-gray-500/20 text-gray-400"
                             }`}
                           >
                             {task.type.charAt(0).toUpperCase() +
@@ -1260,7 +1308,329 @@ export default function Dashboard() {
             </Card>
           </div>
         )}
+
+        {/* Whitepaper Tab */}
+        {activeTab === "whitepaper" && (
+          <div className="space-y-6">
+            <Card className="border-border bg-card p-8">
+              <h2 className="text-2xl font-bold mb-6">Sage Token Whitepaper</h2>
+
+              <div className="space-y-6 text-foreground">
+                {/* Abstract */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">Abstract</h3>
+                  <p className="text-muted-foreground">
+                    Sage is a decentralized community token, first mobile-first
+                    mining ecosystem designed to make cryptocurrency accessible
+                    to everyone. Using a gamified, tap-to-mine mobile app
+                    connected to a secure cloud backend, users can mine the Sage
+                    token without technical knowledge or hardware. By combining
+                    Web3 social media, DAO governance, and real-world utility
+                    through smart contract functionality, brings the
+                    decentralized economy to billions of mobile users.
+                  </p>
+                </div>
+
+                {/* Origin */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">
+                    1. Origin of Cryptocurrency
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Cryptocurrency emerged in 2008 with the Bitcoin whitepaper
+                    by Satoshi Nakamoto. It proposed a decentralized financial
+                    system, removing reliance on centralized banks. Bitcoin's
+                    Genesis Block was mined in 2009, launching a global
+                    movement. Sage builds on this legacy to make blockchain
+                    participation easy and mobile-first.
+                  </p>
+                </div>
+
+                {/* Introduction */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">2. Introduction</h3>
+                  <p className="text-muted-foreground">
+                    Sage token turns smartphones into blockchain portals.
+                    Through its cloud-powered mobile mining app, users can earn
+                    Sage tokens without technical skills or expensive equipment.
+                  </p>
+                </div>
+
+                {/* Challenges */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">
+                    3. Challenges with Traditional Mining
+                  </h3>
+                  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                    <li>Expensive hardware (GPUs/ASICs)</li>
+                    <li>Energy waste & environmental impact</li>
+                    <li>Requires deep technical knowledge</li>
+                  </ul>
+                </div>
+
+                {/* Solution */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">
+                    4. The Sage Token Solution
+                  </h3>
+                  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                    <li>Tap-to-Mine: No hardware needed</li>
+                    <li>Cloud Mining: Minimal device impact</li>
+                    <li>Zero cost entry & easy onboarding</li>
+                    <li>Web3-ready with token utility and governance</li>
+                  </ul>
+                </div>
+
+                {/* Web3 */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">5. Why Web3?</h3>
+                  <p className="text-muted-foreground">
+                    Web3 decentralizes control of the internet. Sage leverages
+                    this to give users full ownership of data, rewards, and
+                    governance. Social platforms, tokens, and governance are
+                    built into the app experience.
+                  </p>
+                </div>
+
+                {/* Vision */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">6. Our Main Vision</h3>
+                  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                    <li>Enable Web3 social apps</li>
+                    <li>Use Sage for real-world payments</li>
+                    <li>Expand via community-driven growth</li>
+                  </ul>
+                </div>
+
+                {/* Mining Roles */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">7. Mining Roles</h3>
+                  <p className="text-muted-foreground">
+                    Users mine Sage daily with just a simple tap. Rates decrease
+                    over time to preserve scarcity. No technical setup is
+                    needed.
+                  </p>
+                </div>
+
+                {/* Tokenomics */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">8. Tokenomics</h3>
+                  <div className="space-y-2 text-muted-foreground ml-4">
+                    <p>
+                      <strong>Name:</strong> Blockchain Sage
+                    </p>
+                    <p>
+                      <strong>Symbol:</strong> Sage
+                    </p>
+                    <p>
+                      <strong>Total Supply:</strong> 900,000,000,000,000 Sage
+                      (900 trillion)
+                    </p>
+                    <p>
+                      <strong>Chain:</strong> Binance Smart Chain (BEP-20)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Roadmap */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">10. Roadmap</h3>
+                  <div className="space-y-4 text-muted-foreground ml-4">
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        Phase 1: Foundation
+                      </p>
+                      <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
+                        <li>Project launch</li>
+                        <li>Android mobile app release</li>
+                        <li>Community building</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        Phase 2: Growth
+                      </p>
+                      <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
+                        <li>iOS app release</li>
+                        <li>KYC & verification system</li>
+                        <li>DEX/CEX listings</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        Phase 3: Utility Expansion
+                      </p>
+                      <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
+                        <li>Web3 Social Media Integration</li>
+                        <li>In-App Wallet</li>
+                        <li>Sage Payment Gateway</li>
+                        <li>DAO Governance</li>
+                        <li>Open SDK/API for developers</li>
+                        <li>Decentralized Identity (DID)</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Security */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">11. Security Model</h3>
+                  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                    <li>Anti-bot Verification & Captcha</li>
+                    <li>KYC & Duplicate Account Prevention</li>
+                    <li>End-to-End Encryption</li>
+                    <li>Audited Smart Contracts</li>
+                  </ul>
+                </div>
+
+                {/* Contact */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">
+                    12. Contact & Social Media
+                  </h3>
+                  <div className="space-y-3 text-muted-foreground">
+                    <p>
+                      <strong>Telegram:</strong>{" "}
+                      <a
+                        href="https://t.me/DecentralizedSagetoken"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline"
+                      >
+                        https://t.me/DecentralizedSagetoken
+                      </a>
+                    </p>
+                    <p>
+                      <strong>Twitter/X:</strong>{" "}
+                      <a
+                        href="https://x.com/Sagetokens?t=UQF-O7ArSLKYi1ecWXnSKQ&s=09"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline"
+                      >
+                        @Sagetokens
+                      </a>
+                    </p>
+                    <p>
+                      <strong>YouTube:</strong>{" "}
+                      <a
+                        href="https://youtube.com/@sagetoken?feature=shared"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline"
+                      >
+                        @sagetoken
+                      </a>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Conclusion */}
+                <div>
+                  <h3 className="text-xl font-bold mb-3">13. Conclusion</h3>
+                  <p className="text-muted-foreground">
+                    Sage represents the next evolution in decentralized
+                    inclusion. By transforming mobile phones into gateways to
+                    Web3, it empowers anyone to participate in blockchain
+                    innovation effortlessly. With a sustainable token model,
+                    transparent mining schedule, and global community — Sage is
+                    ready to reshape mobile mining.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Chat Tab */}
+        {activeTab === "chat" && (
+          <div className="space-y-6">
+            <Card className="border-border bg-card p-8">
+              <h2 className="text-2xl font-bold mb-6">Message Admin</h2>
+              <p className="text-muted-foreground mb-6">
+                Send a message to the admin team. They will respond to your
+                inquiries as soon as possible.
+              </p>
+              <div className="h-96 border border-border rounded-lg p-4 bg-muted/30 overflow-auto mb-4">
+                <ChatCenter
+                  userEmail={user?.email || ""}
+                  userName={user?.fullName || "User"}
+                  isAdmin={false}
+                />
+              </div>
+            </Card>
+
+            {/* Social Media Links */}
+            <Card className="border-border bg-card p-8">
+              <h2 className="text-2xl font-bold mb-6">Follow Us</h2>
+              <div className="grid md:grid-cols-3 gap-4">
+                <a
+                  href="https://t.me/DecentralizedSagetoken"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-xl">💬</span>
+                    </div>
+                    <div>
+                      <p className="font-bold">Telegram</p>
+                      <p className="text-sm text-muted-foreground">
+                        Join our community
+                      </p>
+                    </div>
+                  </div>
+                </a>
+                <a
+                  href="https://x.com/Sagetokens?t=UQF-O7ArSLKYi1ecWXnSKQ&s=09"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-4 rounded-lg bg-black/10 border border-black/20 hover:bg-black/20 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-black/20 flex items-center justify-center">
+                      <span className="text-xl">𝕏</span>
+                    </div>
+                    <div>
+                      <p className="font-bold">Twitter/X</p>
+                      <p className="text-sm text-muted-foreground">
+                        Latest updates
+                      </p>
+                    </div>
+                  </div>
+                </a>
+                <a
+                  href="https://youtube.com/@sagetoken?feature=shared"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-red-500/20 flex items-center justify-center">
+                      <span className="text-xl">📺</span>
+                    </div>
+                    <div>
+                      <p className="font-bold">YouTube</p>
+                      <p className="text-sm text-muted-foreground">
+                        Watch tutorials
+                      </p>
+                    </div>
+                  </div>
+                </a>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
+      {/* Chat Center Button */}
+      {user && (
+        <ChatCenter
+          userEmail={user.email}
+          userName={user.fullName}
+          isAdmin={false}
+        />
+      )}
     </main>
   );
 }

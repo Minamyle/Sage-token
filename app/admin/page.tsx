@@ -22,8 +22,10 @@ import {
   Send,
   CheckCircle2,
   Bell,
+  Lock,
 } from "lucide-react";
 import Link from "next/link";
+import { ChatCenter } from "@/components/chat-center";
 
 interface Task {
   id: string;
@@ -73,6 +75,8 @@ interface AdminSettings {
   minWithdrawal: number;
   enableAds: boolean;
   adFrequency: number; // minutes between ads
+  referralReward: number; // tokens earned per successful referral
+  dashboardPassword: string; // password for dashboard access
 }
 
 interface Announcement {
@@ -94,6 +98,8 @@ export default function AdminPanel() {
     minWithdrawal: 100,
     enableAds: true,
     adFrequency: 5,
+    referralReward: 100,
+    dashboardPassword: "admin123",
   });
   const [formData, setFormData] = useState({
     title: "",
@@ -605,6 +611,11 @@ export default function AdminPanel() {
           >
             <Send className="w-4 h-4 mr-2" />
             Withdrawals
+            {stats.pendingWithdrawals > 0 && (
+              <span className="ml-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                {stats.pendingWithdrawals}
+              </span>
+            )}
           </Button>
           <Button
             onClick={() => setActiveTab("announcements")}
@@ -1024,6 +1035,14 @@ export default function AdminPanel() {
                       </div>
 
                       <div className="space-y-2 py-4 border-y border-border">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">
+                            Wallet Address
+                          </span>
+                          <span className="font-mono text-xs text-accent">
+                            {user.walletId.substring(0, 10)}...{user.walletId.substring(user.walletId.length - 8)}
+                          </span>
+                        </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-muted-foreground">
                             Token Balance
@@ -1510,6 +1529,96 @@ export default function AdminPanel() {
                     <p className="text-xs text-muted-foreground mt-1">
                       Ads shown every {settings.adFrequency} minutes during
                       mining sessions
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Referral Reward Settings */}
+              <Card className="border-border bg-card p-6">
+                <h3 className="text-lg font-bold mb-4">Referral Rewards</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">
+                      Tokens Earned Per Successful Referral
+                    </label>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={settings.referralReward}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 100;
+                          setSettings((prev) => ({
+                            ...prev,
+                            referralReward: value,
+                          }));
+                        }}
+                        className="bg-input border-border text-foreground"
+                      />
+                      <Button
+                        onClick={() => {
+                          localStorage.setItem(
+                            "adminSettings",
+                            JSON.stringify(settings)
+                          );
+                          alert("Referral reward amount updated!");
+                        }}
+                        className="bg-accent text-accent-foreground hover:bg-accent/90"
+                      >
+                        Save
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Users will earn {settings.referralReward} ST for each successful referral
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Dashboard Access Password */}
+              <Card className="border-border bg-card p-6">
+                <h3 className="text-lg font-bold mb-4">
+                  <Lock className="w-4 h-4 inline mr-2" />
+                  Dashboard Access Password
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">
+                      Set Dashboard Access Password
+                    </label>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        type="password"
+                        value={settings.dashboardPassword}
+                        onChange={(e) =>
+                          setSettings((prev) => ({
+                            ...prev,
+                            dashboardPassword: e.target.value,
+                          }))
+                        }
+                        placeholder="Enter new dashboard password"
+                        className="bg-input border-border text-foreground flex-1"
+                      />
+                      <Button
+                        onClick={() => {
+                          if (!settings.dashboardPassword.trim()) {
+                            alert("Password cannot be empty");
+                            return;
+                          }
+                          localStorage.setItem(
+                            "adminSettings",
+                            JSON.stringify(settings)
+                          );
+                          alert("Dashboard password updated successfully!");
+                        }}
+                        className="bg-accent text-accent-foreground hover:bg-accent/90"
+                      >
+                        Save
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This password is required to access the admin dashboard
                     </p>
                   </div>
                 </div>

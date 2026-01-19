@@ -22,7 +22,7 @@ export default function LoginPage() {
     setError("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.email || !formData.password) {
@@ -30,19 +30,31 @@ export default function LoginPage() {
       return;
     }
 
-    // Demo: Accept any credentials
-    localStorage.setItem(
-      "user",
-      JSON.stringify({
-        fullName: "Demo User",
-        email: formData.email,
-        walletId: "0x742d35Cc6634C0532925a3b844Bc9e7595f1a",
-        tokenBalance: 1250,
-      })
-    );
-    localStorage.setItem("isLoggedIn", "true");
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
 
-    window.location.href = "/dashboard";
+      const data = await response.json();
+
+      if (data.success) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("isLoggedIn", "true");
+        window.location.href = "/dashboard";
+      } else {
+        setError(data.error.message);
+      }
+    } catch (error) {
+      setError("Login failed. Please try again.");
+    }
   };
 
   return (

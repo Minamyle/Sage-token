@@ -26,7 +26,7 @@ export default function SignUpPage() {
     setError("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (
@@ -49,59 +49,34 @@ export default function SignUpPage() {
       return;
     }
 
-    // Save to localStorage for demo
-    localStorage.setItem(
-      "user",
-      JSON.stringify({
-        fullName: formData.fullName,
-        email: formData.email,
-        walletId: formData.walletId,
-        tokenBalance: 0,
-      })
-    );
-    localStorage.setItem("isLoggedIn", "true");
-
-    if (formData.referralCode) {
-      // Find referrer by referral code
-      const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]");
-      const referrer = allUsers.find((u: any) => {
-        const refCode = localStorage.getItem(`referralCode_${u.email}`);
-        return refCode === formData.referralCode;
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          walletId: formData.walletId,
+          referralCode: formData.referralCode || undefined,
+        }),
       });
 
-      if (referrer) {
-        const referralData = {
-          referrerId: referrer.email,
-          referrerEmail: referrer.email,
-          referredEmail: formData.email,
-          referredName: formData.fullName,
-          status: "pending",
-          rewardAmount: 100,
-          timestamp: Date.now(),
-        };
+      const data = await response.json();
 
-        const referralsStr = localStorage.getItem(
-          `referrals_${referrer.email}`
-        );
-        const referrals = referralsStr ? JSON.parse(referralsStr) : [];
-        referrals.push(referralData);
-        localStorage.setItem(
-          `referrals_${referrer.email}`,
-          JSON.stringify(referrals)
-        );
+      if (data.success) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("isLoggedIn", "true");
+        window.location.href = "/dashboard";
+      } else {
+        setError(data.error.message);
       }
+    } catch (error) {
+      setError("Registration failed. Please try again.");
     }
-
-    const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]");
-    allUsers.push({
-      fullName: formData.fullName,
-      email: formData.email,
-      walletId: formData.walletId,
-      tokenBalance: 0,
-    });
-    localStorage.setItem("allUsers", JSON.stringify(allUsers));
-
-    window.location.href = "/dashboard";
   };
 
   return (

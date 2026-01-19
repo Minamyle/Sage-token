@@ -16,23 +16,32 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState<"email" | "reset" | "success">("email");
   const [error, setError] = useState("");
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    // Check if user exists
-    const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]");
-    const user = allUsers.find((u: any) => u.email === email);
+    try {
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
 
-    if (!user) {
-      setError("No account found with this email address");
-      return;
+      const data = await response.json();
+
+      if (data.success) {
+        setStep("reset");
+      } else {
+        setError(data.error.message);
+      }
+    } catch (error) {
+      setError("Failed to send reset email. Please try again.");
     }
-
-    setStep("reset");
   };
 
-  const handlePasswordReset = (e: React.FormEvent) => {
+  const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -46,35 +55,28 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    // Update password in allUsers
-    const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]");
-    const updatedAllUsers = allUsers.map((u: any) =>
-      u.email === email ? { ...u, password: newPassword } : u
-    );
-    localStorage.setItem("allUsers", JSON.stringify(updatedAllUsers));
+    try {
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          newPassword,
+        }),
+      });
 
-    // Update password in user_profile if exists
-    const userProfileStr = localStorage.getItem(`user_profile_${email}`);
-    if (userProfileStr) {
-      const userProfile = JSON.parse(userProfileStr);
-      userProfile.password = newPassword;
-      localStorage.setItem(
-        `user_profile_${email}`,
-        JSON.stringify(userProfile)
-      );
-    }
+      const data = await response.json();
 
-    // If user is currently logged in, update their session
-    const currentUserStr = localStorage.getItem("user");
-    if (currentUserStr) {
-      const currentUser = JSON.parse(currentUserStr);
-      if (currentUser.email === email) {
-        currentUser.password = newPassword;
-        localStorage.setItem("user", JSON.stringify(currentUser));
+      if (data.success) {
+        setStep("success");
+      } else {
+        setError(data.error.message);
       }
+    } catch (error) {
+      setError("Failed to reset password. Please try again.");
     }
-
-    setStep("success");
   };
 
   return (
