@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { Zap } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
 
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
@@ -16,9 +17,10 @@ export default function SignUpPage() {
     password: "",
     confirmPassword: "",
     walletId: "",
-    referralCode: "", // added referral code field
+    referralCode: "",
   });
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -28,6 +30,8 @@ export default function SignUpPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
     if (
       !formData.fullName ||
@@ -36,46 +40,47 @@ export default function SignUpPage() {
       !formData.walletId
     ) {
       setError("All fields are required");
+      setIsLoading(false);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
+      setIsLoading(false);
       return;
     }
 
     if (formData.password.length < 8) {
       setError("Password must be at least 8 characters");
+      setIsLoading(false);
       return;
     }
 
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          email: formData.email,
-          password: formData.password,
-          walletId: formData.walletId,
-          referralCode: formData.referralCode || undefined,
-        }),
+      const response = await apiClient.register({
+        email: formData.email,
+        password: formData.password,
+        wallet_address: formData.walletId,
+        referral_code: formData.referralCode || undefined,
+        cookies_enabled: true,
+        privacy_accepted: true,
       });
 
-      const data = await response.json();
+      // Store user data and token
+      localStorage.setItem("user", JSON.stringify(response.user));
+      localStorage.setItem("isLoggedIn", "true");
 
-      if (data.success) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("isLoggedIn", "true");
-        window.location.href = "/dashboard";
-      } else {
-        setError(data.error.message);
-      }
+      // Redirect to dashboard
+      window.location.href = "/dashboard";
     } catch (error) {
-      setError("Registration failed. Please try again.");
+      console.error("Registration failed:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Registration failed. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 

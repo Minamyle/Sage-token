@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { Zap } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -15,6 +16,7 @@ export default function LoginPage() {
     password: "",
   });
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -24,36 +26,36 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
     if (!formData.email || !formData.password) {
       setError("Email and password are required");
+      setIsLoading(false);
       return;
     }
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
+      const response = await apiClient.login({
+        email: formData.email,
+        password: formData.password,
       });
 
-      const data = await response.json();
+      // Store user data
+      localStorage.setItem("user", JSON.stringify(response.user));
+      localStorage.setItem("isLoggedIn", "true");
 
-      if (data.success) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("isLoggedIn", "true");
-        window.location.href = "/dashboard";
-      } else {
-        setError(data.error.message);
-      }
+      // Redirect to dashboard
+      window.location.href = "/dashboard";
     } catch (error) {
-      setError("Login failed. Please try again.");
+      console.error("Login failed:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Login failed. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 

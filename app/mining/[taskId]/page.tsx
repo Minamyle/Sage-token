@@ -8,20 +8,20 @@ import { ToastContainer } from "@/components/notification-toast";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useParams } from "next/navigation";
 import { Zap, Play, Rocket, CheckCircle2 } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
 
 interface Task {
-  id: string;
+  id: number;
   title: string;
   description: string;
-  reward: number;
-  difficulty: "easy" | "medium" | "hard";
-  type: "mining" | "social" | "youtube" | "article" | "twitter" | "admob";
+  reward_amount: number;
+  task_type: "mining" | "social" | "youtube" | "article" | "twitter" | "admob";
+  is_active: boolean;
+  created_at: string;
+  is_completed: boolean;
   timeframe?: number;
-  completedBy: string[];
-  socialLink?: string;
-  youtubeUrl?: string;
-  articleUrl?: string;
-  twitterHandle?: string;
+  difficulty?: string;
+  reward?: number;
 }
 
 interface User {
@@ -32,14 +32,12 @@ interface User {
 }
 
 interface MiningSession {
-  id: string;
-  startTime: number;
-  endTime: number;
-  reward: number;
-  isActive: boolean;
-  boosted: boolean;
-  boostLevel: number; // 0-20x
-  timeReduction: number; // in seconds
+  session_id: number;
+  start_time: string;
+  end_time: string;
+  duration_seconds: number;
+  token_reward_rate: number;
+  boost_count?: number;
 }
 
 export default function MiningPage() {
@@ -82,125 +80,105 @@ export default function MiningPage() {
     );
   };
 
-  const startMining = () => {
+  const startMining = async () => {
     if (!user || !task) return;
 
-    const session: MiningSession = {
-      id: Date.now().toString(),
-      startTime: Date.now(),
-      endTime: Date.now() + (task.timeframe || 4) * 60 * 1000, // Convert minutes to milliseconds
-      reward: task.reward,
-      isActive: true,
-      boosted: false,
-      boostLevel: 0,
-      timeReduction: 0,
-    };
-
-    setMiningSession(session);
-    setIsMining(true);
-    setBoostCount(0);
-    localStorage.setItem(
-      `mining_session_${user.email}_${taskId}`,
-      JSON.stringify(session)
-    );
-
-    showSuccess(
-      "Mining Started",
-      `Mining session started for ${task.timeframe || 4} minutes`
-    );
+    try {
+      const response = await apiClient.startMining();
+      setMiningSession(response);
+      setIsMining(true);
+      setBoostCount(response.boost_count || 0);
+      showSuccess(
+        "Mining Started",
+        `Mining session started for ${response.duration_seconds / 60} minutes`
+      );
+    } catch (error) {
+      console.error("Failed to start mining:", error);
+      showError(
+        "Failed to start mining",
+        error instanceof Error ? error.message : "Please try again"
+      );
+    }
   };
 
-  const boostMining = () => {
-    if (!miningSession || !user || boostCount >= 20) return;
+  const boostMining = async () => {
+    if (!miningSession || boostCount >= 20) return;
 
     // Show ad modal
     setShowAdModal(true);
   };
 
-  const handleAdWatched = () => {
-    if (!miningSession || !user || boostCount >= 20) return;
+  const handleAdWatched = async () => {
+    if (!miningSession || boostCount >= 20) return;
 
-    const newBoostCount = boostCount + 1;
-    const boostMultiplier = 1 + newBoostCount * 0.1; // 1.1x, 1.2x, ... 3.0x (20x total)
-    const newTimeReduction = newBoostCount * 2; // 2 seconds per boost
+    try {
+      const response = await apiClient.boostMining({
+        session_id: miningSession.session_id,
+      });
 
-    const boostedSession: MiningSession = {
-      ...miningSession,
-      reward: Math.floor(task!.reward * boostMultiplier),
-      boosted: newBoostCount > 0,
-      boostLevel: newBoostCount,
-      timeReduction: newTimeReduction,
-      endTime: miningSession.endTime - newTimeReduction * 1000, // Reduce time by 2 seconds per boost
-    };
+      setBoostCount(response.boost_count);
+      setMiningSession({
+        ...miningSession,
+        end_time: response.new_end_time,
+        boost_count: response.boost_count,
+      });
+      setShowAdModal(false);
 
-    setMiningSession(boostedSession);
-    setBoostCount(newBoostCount);
-    setShowAdModal(false);
-    localStorage.setItem(
-      `mining_session_${user.email}_${taskId}`,
-      JSON.stringify(boostedSession)
-    );
-
-    const multiplierDisplay = (boostMultiplier * 10).toFixed(0);
-    showSuccess(
-      "Boost Applied!",
-      `Mining boosted to ${multiplierDisplay}% reward. ${
-        20 - newBoostCount
-      } more boosts available!`
-    );
-
-    if (newBoostCount >= 20) {
+      const multiplierDisplay = (response.boost_count * 10).toFixed(0);
       showSuccess(
-        "Max Boost Reached!",
-        "You've reached the maximum 20x boost multiplier!"
+        "Boost Applied!",
+        `Mining boosted to ${multiplierDisplay}% reward. ${
+          20 - response.boost_count
+        } more boosts available!`
       );
+
+      if (response.boost_count >= 20) {
+        showSuccess(
+          "Max Boost Reached!",
+          "You've reached the maximum 20x boost multiplier!"
+        );
+      }
+    } catch (error) {
+      console.error("Failed to boost mining:", error);
+      showError(
+        "Failed to boost mining",
+        error instanceof Error ? error.message : "Please try again"
+      );
+      setShowAdModal(false);
     }
   };
 
-  const completeMiningSession = (session: MiningSession, userEmail: string) => {
-    const updatedUser = {
-      ...user!,
-      tokenBalance: user!.tokenBalance + session.reward,
-    };
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+  const completeMiningSession = async (session: MiningSession) => {
+    try {
+      const response = await apiClient.completeMining({
+        session_id: session.session_id,
+      });
 
-    // Update user profile
-    const allUsers = JSON.parse(localStorage.getItem("allUsers") || "[]");
-    const userIndex = allUsers.findIndex((u: any) => u.email === userEmail);
-    if (userIndex !== -1) {
-      allUsers[userIndex] = updatedUser;
-      localStorage.setItem("allUsers", JSON.stringify(allUsers));
+      // Update user balance
+      const updatedUser = {
+        ...user!,
+        tokenBalance: response.new_balance,
+      };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+
+      createNotification(
+        user!.email,
+        "task",
+        "Mining Completed!",
+        `You earned ${response.tokens_earned} ST from mining session.`
+      );
+
+      showSuccess(
+        "Mining Completed!",
+        `You earned ${response.tokens_earned} ST!`
+      );
+    } catch (error) {
+      console.error("Failed to complete mining:", error);
+      showError(
+        "Failed to complete mining",
+        error instanceof Error ? error.message : "Please try again"
+      );
     }
-
-    localStorage.setItem(
-      `user_profile_${userEmail}`,
-      JSON.stringify(updatedUser)
-    );
-    localStorage.removeItem(`mining_session_${userEmail}_${taskId}`);
-
-    // Mark task as completed
-    localStorage.setItem(`user_${userEmail}_completed_${taskId}`, "true");
-
-    const completedTasksIds = localStorage.getItem(
-      `completedTasks_${userEmail}`
-    );
-    const completed = completedTasksIds ? JSON.parse(completedTasksIds) : [];
-    completed.push(taskId);
-    localStorage.setItem(
-      `completedTasks_${userEmail}`,
-      JSON.stringify(completed)
-    );
-
-    createNotification(
-      userEmail,
-      "task",
-      "Mining Completed!",
-      `You earned ${session.reward} ST from mining session. ${
-        session.boosted ? "(Boosted)" : ""
-      }`
-    );
-
-    showSuccess("Mining Completed!", `You earned ${session.reward} ST!`);
   };
 
   const formatTime = (milliseconds: number) => {
@@ -210,65 +188,74 @@ export default function MiningPage() {
   };
 
   useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      setUser(JSON.parse(userStr));
-    }
+    const loadData = async () => {
+      // Load user data
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        setUser(JSON.parse(userStr));
+      }
 
-    const tasksStr = localStorage.getItem("adminTasks");
-    if (tasksStr) {
+      // Load task data from API
       try {
-        const tasks = JSON.parse(tasksStr);
-        const foundTask = tasks.find(
-          (t: Task) => t.id === taskId && t.type === "mining"
-        );
+        const tasks = await apiClient.getTasks();
+        const foundTask = tasks.find((t: Task) => t.id === parseInt(taskId));
         setTask(foundTask || null);
-      } catch {
+      } catch (error) {
+        console.error("Failed to load task:", error);
         setTask(null);
       }
-    }
 
-    // Check if user has active mining session
-    if (userStr) {
-      const userEmail = JSON.parse(userStr).email;
-      const sessionStr = localStorage.getItem(
-        `mining_session_${userEmail}_${taskId}`
-      );
-      if (sessionStr) {
-        const session: MiningSession = JSON.parse(sessionStr);
-        if (session.isActive && session.endTime > Date.now()) {
-          setMiningSession(session);
-          setIsMining(true);
-        } else if (session.isActive) {
-          // Session completed
-          completeMiningSession(session, userEmail);
+      // Check for active mining session
+      const checkActiveSession = async () => {
+        try {
+          const response = await apiClient.getActiveMiningSession();
+          if (response.is_active) {
+            setMiningSession({
+              session_id: response.mining_circle_id!,
+              start_time: response.start_time!,
+              end_time: response.end_time!,
+              duration_seconds: response.duration_seconds!,
+              token_reward_rate: response.token_reward_rate!,
+              boost_count: 0, // This might need to be fetched separately
+            });
+            setIsMining(true);
+            setBoostCount(0); // Initialize boost count for active session
+          }
+        } catch (error) {
+          console.error("Failed to check active session:", error);
         }
+      };
+
+      if (userStr) {
+        checkActiveSession();
       }
-    }
+    };
+
+    loadData();
   }, [taskId]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isMining && miningSession) {
       interval = setInterval(() => {
-        const now = Date.now();
-        const remaining = Math.max(0, miningSession.endTime - now);
+        const now = new Date().getTime();
+        const endTime = new Date(miningSession.end_time).getTime();
+        const remaining = Math.max(0, endTime - now);
         setTimeLeft(remaining);
 
-        const totalTime = miningSession.endTime - miningSession.startTime;
+        const startTime = new Date(miningSession.start_time).getTime();
+        const totalTime = endTime - startTime;
         const elapsed = totalTime - remaining;
         setProgress((elapsed / totalTime) * 100);
 
         if (remaining <= 0) {
           setIsMining(false);
-          if (user) {
-            completeMiningSession(miningSession, user.email);
-          }
+          completeMiningSession(miningSession);
         }
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isMining, miningSession, user]);
+  }, [isMining, miningSession]);
 
   if (!task || !user) {
     return (
@@ -280,8 +267,41 @@ export default function MiningPage() {
     );
   }
 
+  // Check if task is already completed
+  if (task.is_completed) {
+    return (
+      <main className="min-h-screen bg-linear-to-b from-slate-900 via-slate-800 to-slate-900 text-foreground flex items-center justify-center">
+        <Card className="border-blue-500/40 bg-slate-800/80 p-12 text-center max-w-md backdrop-blur-sm">
+          <div className="flex justify-center mb-6">
+            <div className="w-24 h-24 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
+              <svg
+                className="w-12 h-12 text-green-400"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-3xl font-bold text-white mb-2">
+            Task Completed!
+          </h2>
+          <p className="text-blue-300 mb-8">
+            You have successfully completed this task and earned{" "}
+            {task.reward_amount} ST.
+          </p>
+          <Link href="/dashboard">
+            <Button className="bg-blue-500 text-white hover:bg-blue-600">
+              Return to Dashboard
+            </Button>
+          </Link>
+        </Card>
+      </main>
+    );
+  }
+
   // Handle mining-type tasks with the mining interface
-  if (task.type === "mining") {
+  if (task.task_type === "mining") {
     return (
       <main className="min-h-screen bg-linear-to-b from-slate-900 via-slate-800 to-slate-900 text-foreground flex flex-col">
         <ToastContainer toasts={toasts} onClose={removeToast} />
@@ -301,7 +321,9 @@ export default function MiningPage() {
               </div>
 
               <div className="bg-slate-900/50 border border-blue-500/30 rounded-lg p-4 mb-6">
-                <p className="text-xs text-blue-300 mb-2">CURRENT BOOST LEVEL</p>
+                <p className="text-xs text-blue-300 mb-2">
+                  CURRENT BOOST LEVEL
+                </p>
                 <div className="flex items-center justify-between">
                   <span className="text-3xl font-bold text-blue-400">
                     {boostCount + 1}x
@@ -373,21 +395,27 @@ export default function MiningPage() {
                 <span className="text-sm text-blue-300 font-semibold uppercase tracking-widest">
                   Mining Reward
                 </span>
-                {miningSession && miningSession.boostLevel > 0 && (
+                {miningSession && (miningSession.boost_count || 0) > 0 && (
                   <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
-                    {miningSession.boostLevel}x BOOSTED
+                    {miningSession.boost_count}x BOOSTED
                   </span>
                 )}
               </div>
               <div className="flex items-center justify-center gap-1">
                 <span className="text-6xl font-bold text-blue-400">
-                  {miningSession ? miningSession.reward : task.reward}
+                  {miningSession
+                    ? Math.floor(
+                        (miningSession.token_reward_rate *
+                          miningSession.duration_seconds) /
+                          60
+                      )
+                    : task.reward_amount}
                 </span>
                 <span className="text-3xl font-bold text-blue-300">ST</span>
               </div>
-              {miningSession && miningSession.boostLevel > 0 && (
+              {miningSession && (miningSession.boost_count || 0) > 0 && (
                 <p className="text-xs text-yellow-400 mt-2">
-                  +{miningSession.timeReduction}s time reduction
+                  +{(miningSession.boost_count || 0) * 10}% reward boost
                 </p>
               )}
             </div>
@@ -460,14 +488,14 @@ export default function MiningPage() {
                   </p>
                   <div
                     className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider inline-block ${
-                      task.difficulty === "easy"
+                      (task.difficulty || "easy") === "easy"
                         ? "bg-green-500/20 text-green-400 border border-green-500/50"
-                        : task.difficulty === "medium"
-                        ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
-                        : "bg-red-500/20 text-red-400 border border-red-500/50"
+                        : (task.difficulty || "easy") === "medium"
+                          ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
+                          : "bg-red-500/20 text-red-400 border border-red-500/50"
                     }`}
                   >
-                    {task.difficulty}
+                    {task.difficulty || "easy"}
                   </div>
                 </div>
               </div>
@@ -501,7 +529,8 @@ export default function MiningPage() {
             {isMining && (
               <div className="mt-4 text-center">
                 <p className="text-xs text-blue-300">
-                  Watch ads to boost mining up to 20x! Each boost adds +10% reward and reduces time by 2 seconds.
+                  Watch ads to boost mining up to 20x! Each boost adds +10%
+                  reward and reduces time by 2 seconds.
                 </p>
                 {boostCount >= 20 && (
                   <p className="text-xs text-yellow-400 mt-2 font-semibold">
@@ -517,8 +546,7 @@ export default function MiningPage() {
   }
 
   // Handle other task types with completion interface
-  const userCompleted =
-    localStorage.getItem(`user_${user.email}_completed_${taskId}`) === "true";
+  const userCompleted = false; // API will handle completion status
 
   if (userCompleted) {
     return (
@@ -539,8 +567,8 @@ export default function MiningPage() {
             Task Completed!
           </h2>
           <p className="text-blue-300 mb-8">
-            You have successfully completed this task and earned {task.reward}{" "}
-            ST.
+            You have successfully completed this task and earned{" "}
+            {task.reward_amount} ST.
           </p>
           <Link href="/dashboard">
             <Button className="bg-blue-500 text-white hover:bg-blue-600">
@@ -595,7 +623,7 @@ export default function MiningPage() {
             </div>
             <div className="flex items-center justify-center gap-1">
               <span className="text-6xl font-bold text-blue-400">
-                {task.reward}
+                {task.reward_amount}
               </span>
               <span className="text-3xl font-bold text-blue-300">ST</span>
             </div>
@@ -609,69 +637,49 @@ export default function MiningPage() {
               <p className="text-blue-200 text-sm mb-4">{task.description}</p>
 
               {/* Task-specific instructions */}
-              {task.type === "social" && task.socialLink && (
+              {task.task_type === "social" && (
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
                   <p className="text-blue-300 text-sm mb-2">
                     Follow this account:
                   </p>
-                  <a
-                    href={task.socialLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 underline hover:text-blue-300"
-                  >
-                    {task.socialLink}
-                  </a>
+                  <p className="text-blue-400">
+                    Social media task - complete the required action
+                  </p>
                 </div>
               )}
 
-              {task.type === "youtube" && task.youtubeUrl && (
+              {task.task_type === "youtube" && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
                   <p className="text-red-300 text-sm mb-2">Watch this video:</p>
-                  <a
-                    href={task.youtubeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-red-400 underline hover:text-red-300"
-                  >
-                    {task.youtubeUrl}
-                  </a>
+                  <p className="text-red-400">
+                    YouTube task - watch the required video
+                  </p>
                 </div>
               )}
 
-              {task.type === "article" && task.articleUrl && (
+              {task.task_type === "article" && (
                 <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 mb-4">
                   <p className="text-orange-300 text-sm mb-2">
                     Read this article:
                   </p>
-                  <a
-                    href={task.articleUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-orange-400 underline hover:text-orange-300"
-                  >
-                    {task.articleUrl}
-                  </a>
+                  <p className="text-orange-400">
+                    Article task - read the required content
+                  </p>
                 </div>
               )}
 
-              {task.type === "twitter" && task.twitterHandle && (
+              {task.task_type === "twitter" && (
                 <div className="bg-sky-500/10 border border-sky-500/30 rounded-lg p-4 mb-4">
                   <p className="text-sky-300 text-sm mb-2">
                     Follow this account:
                   </p>
-                  <a
-                    href={`https://twitter.com/${task.twitterHandle}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sky-400 underline hover:text-sky-300"
-                  >
-                    @{task.twitterHandle}
-                  </a>
+                  <p className="text-sky-400">
+                    Twitter task - complete the required action
+                  </p>
                 </div>
               )}
 
-              {task.type === "admob" && (
+              {task.task_type === "admob" && (
                 <div className="bg-gray-500/10 border border-gray-500/30 rounded-lg p-4 mb-4">
                   <p className="text-gray-300 text-sm">
                     Watch the AdMob advertisement to complete this task.
@@ -683,72 +691,51 @@ export default function MiningPage() {
             <div className="flex items-center justify-between pt-4 border-t border-blue-500/20 mb-6">
               <div className="text-center flex-1">
                 <p className="text-xs text-blue-300 mb-1 font-semibold uppercase tracking-widest">
-                  Difficulty
+                  Task Type
                 </p>
-                <div
-                  className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider ${
-                    task.difficulty === "easy"
-                      ? "bg-green-500/20 text-green-400 border border-green-500/50"
-                      : task.difficulty === "medium"
-                      ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
-                      : "bg-red-500/20 text-red-400 border border-red-500/50"
-                  }`}
-                >
-                  {task.difficulty}
+                <div className="px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/50">
+                  {task.task_type}
                 </div>
               </div>
             </div>
 
             <Button
-              onClick={() => {
-                // Mark task as completed
-                const updatedUser = {
-                  ...user,
-                  tokenBalance: user.tokenBalance + task.reward,
-                };
-                localStorage.setItem("user", JSON.stringify(updatedUser));
+              onClick={async () => {
+                try {
+                  const response = await apiClient.completeTask({
+                    task_id: parseInt(taskId),
+                  });
 
-                const allUsers = JSON.parse(
-                  localStorage.getItem("allUsers") || "[]"
-                );
-                const userIndex = allUsers.findIndex(
-                  (u: any) => u.email === user.email
-                );
-                if (userIndex !== -1) {
-                  allUsers[userIndex] = updatedUser;
-                  localStorage.setItem("allUsers", JSON.stringify(allUsers));
+                  // Update user balance
+                  const updatedUser = {
+                    ...user,
+                    tokenBalance: response.new_balance,
+                  };
+                  localStorage.setItem("user", JSON.stringify(updatedUser));
+
+                  createNotification(
+                    user.email,
+                    "task",
+                    "Task Completed!",
+                    `You successfully completed "${task.title}" and earned ${response.reward_claimed} ST.`
+                  );
+
+                  showSuccess(
+                    "Task Completed!",
+                    `You earned ${response.reward_claimed} ST!`
+                  );
+
+                  // Redirect after a short delay
+                  setTimeout(() => {
+                    window.location.href = "/dashboard";
+                  }, 2000);
+                } catch (error) {
+                  console.error("Failed to complete task:", error);
+                  showError(
+                    "Failed to complete task",
+                    error instanceof Error ? error.message : "Please try again"
+                  );
                 }
-
-                localStorage.setItem(
-                  `user_${user.email}_completed_${taskId}`,
-                  "true"
-                );
-
-                const completedTasksIds = localStorage.getItem(
-                  `completedTasks_${user.email}`
-                );
-                const completed = completedTasksIds
-                  ? JSON.parse(completedTasksIds)
-                  : [];
-                completed.push(taskId);
-                localStorage.setItem(
-                  `completedTasks_${user.email}`,
-                  JSON.stringify(completed)
-                );
-
-                createNotification(
-                  user.email,
-                  "task",
-                  "Task Completed!",
-                  `You successfully completed "${task.title}" and earned ${task.reward} ST.`
-                );
-
-                showSuccess("Task Completed!", `You earned ${task.reward} ST!`);
-
-                // Redirect after a short delay
-                setTimeout(() => {
-                  window.location.href = "/dashboard";
-                }, 2000);
               }}
               size="lg"
               className="w-full bg-blue-500 hover:bg-blue-600 text-white text-base font-bold py-7 rounded-2xl shadow-lg shadow-blue-500/50 transition-all hover:shadow-blue-500/80"

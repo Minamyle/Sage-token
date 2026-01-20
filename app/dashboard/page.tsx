@@ -35,20 +35,18 @@ import { ToastContainer } from "@/components/notification-toast";
 import { useNotifications } from "@/hooks/use-notifications";
 import { NotificationsPage } from "@/components/notifications-page";
 import { ChatCenter } from "@/components/chat-center";
+import { apiClient } from "@/lib/api-client";
 
 interface Task {
-  id: string;
+  id: number;
   title: string;
   description: string;
-  reward: number;
-  difficulty: "easy" | "medium" | "hard";
-  type: "mining" | "social" | "youtube" | "article" | "twitter" | "admob";
-  timeframe?: number;
-  completedBy: string[];
-  socialLink?: string;
-  youtubeUrl?: string;
-  articleUrl?: string;
-  twitterHandle?: string;
+  reward_amount: number;
+  task_type: "mining" | "social" | "youtube" | "article" | "twitter" | "admob";
+  is_active: boolean;
+  created_at: string;
+  is_completed: boolean;
+  difficulty?: string;
 }
 
 interface User {
@@ -59,12 +57,13 @@ interface User {
 }
 
 interface WithdrawalRequest {
-  id: string;
-  email: string;
+  id: number;
+  user_id: number;
   amount: number;
-  walletId: string;
-  status: "pending" | "completed";
-  timestamp: number;
+  wallet_address: string;
+  status: "pending" | "completed" | "rejected";
+  created_at: string;
+  processed_at?: string;
 }
 
 interface Referral {
@@ -87,7 +86,6 @@ interface Stats {
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [stats, setStats] = useState<Stats>({
     tasksCompleted: 0,
     totalEarned: 0,
@@ -111,8 +109,8 @@ export default function Dashboard() {
     WithdrawalRequest[]
   >([]);
   const [referralCode, setReferralCode] = useState("");
-  const [referrals, setReferrals] = useState<Referral[]>([]);
   const [referralRewards, setReferralRewards] = useState(0);
+  const [referralStats, setReferralStats] = useState<any>(null);
   const [settings, setSettings] = useState({
     exchangeRate: 0.1,
     minWithdrawal: 100,
@@ -124,151 +122,69 @@ export default function Dashboard() {
   const { toasts, removeToast, showSuccess, showError } = useNotifications();
 
   useEffect(() => {
-    // Load user data
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      const userData = JSON.parse(userStr);
-      setUser(userData);
+    const loadDashboardData = async () => {
+      // Load user data
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const userData = JSON.parse(userStr);
+        setUser(userData);
 
-      // Load completed tasks
-      const completedTasksIds = localStorage.getItem(
-        `completedTasks_${userData.email}`
-      );
-      if (completedTasksIds) {
-        setCompletedTasks(JSON.parse(completedTasksIds));
-      }
-
-      // Generate referral code if not exists
-      let refCode = localStorage.getItem(`referralCode_${userData.email}`);
-      if (!refCode) {
-        refCode = `SAGE-${userData.email
-          .split("@")[0]
-          .toUpperCase()}-${Math.random()
-          .toString(36)
-          .substring(2, 8)
-          .toUpperCase()}`;
-        localStorage.setItem(`referralCode_${userData.email}`, refCode);
-      }
-      setReferralCode(refCode);
-
-      // Load referral data
-      const referralsStr = localStorage.getItem(`referrals_${userData.email}`);
-      if (referralsStr) {
-        setReferrals(JSON.parse(referralsStr));
-      }
-
-      const rewardsStr = localStorage.getItem(
-        `referralRewards_${userData.email}`
-      );
-      if (rewardsStr) {
-        setReferralRewards(Number.parseInt(rewardsStr));
-      }
-    }
-
-    // Load admin tasks
-    const tasksStr = localStorage.getItem("adminTasks");
-    if (tasksStr) {
-      try {
-        const allTasks = JSON.parse(tasksStr);
-        // Migrate old "normal" type to "mining"
-        const migratedTasks = allTasks.map((task: any) => ({
-          ...task,
-          type: task.type === "normal" ? "mining" : task.type,
-        }));
-        setTasks(migratedTasks);
-      } catch {
-        setTasks([]);
-      }
-    } else {
-      const defaultTasks: Task[] = [
-        {
-          id: "1",
-          title: "Data Validation",
-          description: "Validate and clean dataset",
-          reward: 500,
-          difficulty: "easy",
-          type: "mining",
-          timeframe: 4,
-          completedBy: [],
-        },
-        {
-          id: "2",
-          title: "Content Review",
-          description: "Review and categorize content",
-          reward: 350,
-          difficulty: "medium",
-          type: "mining",
-          timeframe: 4,
-          completedBy: [],
-        },
-        {
-          id: "3",
-          title: "Quality Assurance",
-          description: "Test platform features",
-          reward: 600,
-          difficulty: "hard",
-          type: "mining",
-          timeframe: 4,
-          completedBy: [],
-        },
-      ];
-      setTasks(defaultTasks);
-    }
-
-    // Load withdrawal history
-    if (userStr) {
-      const userEmail = JSON.parse(userStr).email;
-      const withdrawalsStr = localStorage.getItem(`withdrawals_${userEmail}`);
-      if (withdrawalsStr) {
-        setWithdrawalHistory(JSON.parse(withdrawalsStr));
-      }
-    }
-
-    // Load admin settings
-    const settingsStr = localStorage.getItem("adminSettings");
-    if (settingsStr) {
-      try {
-        setSettings(JSON.parse(settingsStr));
-      } catch {
-        // Keep default settings
-      }
-    }
-
-    // Load notifications
-    if (userStr) {
-      const userEmail = JSON.parse(userStr).email;
-      const notificationsStr = localStorage.getItem(
-        `notifications_${userEmail}`
-      );
-      if (notificationsStr) {
         try {
-          setNotifications(JSON.parse(notificationsStr));
-        } catch {
-          setNotifications([]);
+          // Load tasks from API
+          const tasksResponse = await apiClient.getTasks();
+          setTasks(tasksResponse);
+
+          // Load referral stats
+          const referralStats = await apiClient.getReferralStats();
+          setReferralCode(referralStats.referral_code);
+          setReferralRewards(referralStats.total_rewards_earned);
+          setReferralStats(referralStats);
+
+          // Load notifications
+          const notificationsResponse = await apiClient.getNotifications();
+          setNotifications(notificationsResponse);
+
+          // Load withdrawal history
+          const withdrawalsResponse = await apiClient.getWithdrawals();
+          setWithdrawals(
+            withdrawalsResponse.filter((w) => w.status === "pending")
+          );
+          setWithdrawalHistory(
+            withdrawalsResponse.filter((w) => w.status === "completed")
+          );
+        } catch (error) {
+          console.error("Failed to load dashboard data:", error);
+          showError("Failed to load data", "Please refresh the page");
         }
       }
-    }
+
+      // Load admin settings (this might still be local for now)
+      const settingsStr = localStorage.getItem("adminSettings");
+      if (settingsStr) {
+        setSettings(JSON.parse(settingsStr));
+      }
+    };
+
+    loadDashboardData();
   }, []);
 
   useEffect(() => {
-    // Calculate stats from user completed tasks
-    if (user && tasks.length > 0) {
+    // Calculate stats from tasks loaded from API
+    if (tasks.length > 0) {
+      const completedTasks = tasks.filter((task) => task.is_completed);
       const totalRewards = completedTasks.reduce(
-        (sum: number, taskId: string) => {
-          const task = tasks.find((t) => t.id === taskId);
-          return sum + (task?.reward || 0);
-        },
+        (sum: number, task: Task) => sum + task.reward_amount,
         0
       );
 
       setStats({
         tasksCompleted: completedTasks.length,
         totalEarned: totalRewards,
-        currentStreak: completedTasks.length,
+        currentStreak: completedTasks.length, // This could be improved with actual streak logic
         totalCompleted: tasks.length,
       });
     }
-  }, [user, tasks, completedTasks]);
+  }, [tasks]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -348,7 +264,7 @@ export default function Dashboard() {
     );
   };
 
-  const handleRequestWithdrawal = () => {
+  const handleRequestWithdrawal = async () => {
     if (!user) return;
 
     const amount = Number.parseInt(withdrawalAmount);
@@ -370,38 +286,30 @@ export default function Dashboard() {
       return;
     }
 
-    const withdrawal: WithdrawalRequest = {
-      id: Date.now().toString(),
-      email: user.email,
-      amount,
-      walletId: user.walletId,
-      status: "pending",
-      timestamp: Date.now(),
-    };
+    try {
+      await apiClient.requestWithdrawal({
+        amount: amount,
+        wallet_address: user.walletId,
+      });
 
-    const updatedUser = { ...user, tokenBalance: user.tokenBalance - amount };
-    setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+      // Update local user balance (API should handle this, but update locally for UI)
+      const updatedUser = { ...user, tokenBalance: user.tokenBalance - amount };
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
 
-    setWithdrawalHistory([...withdrawalHistory, withdrawal]);
-    localStorage.setItem(
-      `withdrawals_${user.email}`,
-      JSON.stringify([...withdrawalHistory, withdrawal])
-    );
-    setWithdrawalAmount("");
+      setWithdrawalAmount("");
 
-    // Create withdrawal notification
-    createNotification(
-      "withdrawal",
-      "Withdrawal Request Submitted",
-      `Your withdrawal request for ${amount} ST has been submitted and is pending approval.`,
-      user.email
-    );
-
-    showSuccess(
-      "Withdrawal Requested",
-      `Request for ${amount} ST submitted for processing`
-    );
+      showSuccess(
+        "Withdrawal Requested",
+        `Request for ${amount} ST submitted for processing`
+      );
+    } catch (error) {
+      console.error("Failed to request withdrawal:", error);
+      showError(
+        "Failed to request withdrawal",
+        error instanceof Error ? error.message : "Please try again"
+      );
+    }
   };
 
   const copyReferralCode = () => {
@@ -465,8 +373,10 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  const miningTasks = tasks.filter((task) => task.type === "mining");
-  const otherTasks = tasks.filter((task) => task.type !== "mining");
+  const miningTasks = tasks.filter(
+    (task) => task.task_type === "mining" && !task.is_completed
+  );
+  const otherTasks = tasks.filter((task) => task.task_type !== "mining");
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -526,7 +436,7 @@ export default function Dashboard() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    className="text-destructive-foreground hover:bg-destructive/90"
+                    className="text-white hover:bg-destructive/90"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Delete Account
@@ -721,7 +631,7 @@ export default function Dashboard() {
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {miningTasks
-                .filter((task) => !completedTasks.includes(task.id))
+                .filter((task) => !task.is_completed)
                 .map((task) => {
                   const difficultyColor =
                     task.difficulty === "easy"
@@ -747,8 +657,10 @@ export default function Dashboard() {
                             <div
                               className={`px-2 py-1 rounded text-xs font-semibold ${difficultyColor}`}
                             >
-                              {task.difficulty.charAt(0).toUpperCase() +
-                                task.difficulty.slice(1)}
+                              {(task.difficulty || "easy")
+                                .charAt(0)
+                                .toUpperCase() +
+                                (task.difficulty || "easy").slice(1)}
                             </div>
                             <div className="px-2 py-1 rounded text-xs font-semibold bg-blue-500/20 text-blue-400">
                               Mining
@@ -761,7 +673,7 @@ export default function Dashboard() {
                             Reward
                           </p>
                           <p className="font-semibold text-accent text-lg">
-                            {task.reward} ST
+                            {task.reward_amount} ST
                           </p>
                         </div>
 
@@ -780,8 +692,7 @@ export default function Dashboard() {
                 })}
             </div>
 
-            {miningTasks.filter((task) => !completedTasks.includes(task.id))
-              .length === 0 && (
+            {miningTasks.length === 0 && (
               <Card className="border-border bg-card p-8 text-center">
                 <p className="text-muted-foreground">
                   No mining sessions available. Check back later.
@@ -801,19 +712,11 @@ export default function Dashboard() {
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {otherTasks.map((task) => {
-                const userCompleted = completedTasks.includes(task.id);
-                const difficultyColor =
-                  task.difficulty === "easy"
-                    ? "bg-green-500/20 text-green-400"
-                    : task.difficulty === "medium"
-                      ? "bg-yellow-500/20 text-yellow-400"
-                      : "bg-red-500/20 text-red-400";
-
                 return (
                   <Card
                     key={task.id}
                     className={`border-border bg-card hover:border-accent/50 transition-colors ${
-                      userCompleted ? "opacity-60" : ""
+                      task.is_completed ? "opacity-60" : ""
                     }`}
                   >
                     <div className="p-6">
@@ -826,26 +729,20 @@ export default function Dashboard() {
                         </div>
                         <div className="flex gap-1">
                           <div
-                            className={`px-2 py-1 rounded text-xs font-semibold ${difficultyColor}`}
-                          >
-                            {task.difficulty.charAt(0).toUpperCase() +
-                              task.difficulty.slice(1)}
-                          </div>
-                          <div
                             className={`px-2 py-1 rounded text-xs font-semibold ${
-                              task.type === "social"
+                              task.task_type === "social"
                                 ? "bg-purple-500/20 text-purple-400"
-                                : task.type === "youtube"
+                                : task.task_type === "youtube"
                                   ? "bg-red-500/20 text-red-400"
-                                  : task.type === "article"
+                                  : task.task_type === "article"
                                     ? "bg-orange-500/20 text-orange-400"
-                                    : task.type === "twitter"
+                                    : task.task_type === "twitter"
                                       ? "bg-sky-500/20 text-sky-400"
                                       : "bg-gray-500/20 text-gray-400"
                             }`}
                           >
-                            {task.type.charAt(0).toUpperCase() +
-                              task.type.slice(1)}
+                            {task.task_type.charAt(0).toUpperCase() +
+                              task.task_type.slice(1)}
                           </div>
                         </div>
                       </div>
@@ -853,11 +750,11 @@ export default function Dashboard() {
                       <div className="flex items-center justify-between pt-4 border-t border-border">
                         <p className="text-muted-foreground text-sm">Reward</p>
                         <p className="font-semibold text-accent text-lg">
-                          {task.reward} ST
+                          {task.reward_amount} ST
                         </p>
                       </div>
 
-                      {!userCompleted ? (
+                      {!task.is_completed ? (
                         <Link
                           href={`/mining/${task.id}`}
                           className="block mt-4"
@@ -936,42 +833,31 @@ export default function Dashboard() {
             </Card>
 
             <Card className="border-border bg-card p-8">
-              <h3 className="text-lg font-bold mb-4">
-                Successful Referrals (
-                {referrals.filter((r) => r.status === "completed").length})
-              </h3>
+              <h3 className="text-lg font-bold mb-4">Referral Statistics</h3>
 
-              {referrals.length === 0 ? (
-                <p className="text-muted-foreground">
-                  No referrals yet. Share your code to start earning!
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {referrals
-                    .sort((a, b) => b.timestamp - a.timestamp)
-                    .map((ref, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-4 bg-card/50 rounded-lg border border-border"
-                      >
-                        <div>
-                          <p className="font-semibold">{ref.referredName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {ref.referredEmail}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-accent">
-                            +{ref.rewardAmount} ST
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(ref.timestamp).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg bg-card/50 border border-border">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Total Referrals
+                  </p>
+                  <p className="text-2xl font-bold text-accent">
+                    {referralStats?.total_referrals || 0}
+                  </p>
                 </div>
-              )}
+                <div className="p-4 rounded-lg bg-card/50 border border-border">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Total Rewards Earned
+                  </p>
+                  <p className="text-2xl font-bold text-accent">
+                    {referralRewards} ST
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-muted-foreground mt-4">
+                Referral details are tracked automatically. Keep sharing your
+                code to earn more rewards!
+              </p>
             </Card>
           </div>
         )}
@@ -1050,7 +936,7 @@ export default function Dashboard() {
                       <div>
                         <p className="font-semibold">{wd.amount} ST</p>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(wd.timestamp).toLocaleDateString()}
+                          {new Date(wd.created_at).toLocaleDateString()}
                         </p>
                       </div>
                       <div
