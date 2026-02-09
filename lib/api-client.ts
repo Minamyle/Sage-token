@@ -1,5 +1,5 @@
 // API Client for Sage Token Application
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = "https://sage-token-backend.onrender.com/";
 
 // API Response Types
 interface StartMiningResponse {
